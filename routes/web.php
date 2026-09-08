@@ -7,6 +7,8 @@ use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\SubcategoryController;
 use App\Http\Controllers\Admin\SizeController;
 use App\Http\Controllers\Admin\UnitController;
+use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -16,6 +18,10 @@ Route::get('/', function () {
 Route::view('/admin', 'admin.dashboard')->name('admin.dashboard');
 
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::resource('warehouses', WarehouseController::class)->except('show');
+    Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
+    Route::post('products', [ProductController::class, 'store'])->name('products.store');
     Route::resource('brands', BrandController::class)->except('show');
     Route::resource('colors', ColorController::class)->except('show');
     Route::resource('sizes', SizeController::class)->except('show');
