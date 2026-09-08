@@ -64,4 +64,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (label) label.textContent = choice.dataset.mediaName;
         Modal.getOrCreateInstance(pickerModal).hide();
     });
+
+    document.querySelectorAll('[data-color-picker]').forEach((picker) => {
+        const code = document.querySelector(picker.dataset.colorPicker);
+        picker.addEventListener('input', () => { if (code) code.value = picker.value.toUpperCase(); });
+        code?.addEventListener('input', () => { if (/^#[0-9A-Fa-f]{6}$/.test(code.value)) picker.value = code.value; });
+    });
+
+    document.querySelectorAll('input[type="checkbox"][name="is_active"]').forEach((checkbox) => {
+        checkbox.form?.addEventListener('submit', () => {
+            if (!checkbox.checked && !checkbox.form.querySelector('input[data-status-fallback]')) {
+                const fallback = document.createElement('input');
+                fallback.type = 'hidden';
+                fallback.name = 'is_active';
+                fallback.value = '0';
+                fallback.dataset.statusFallback = 'true';
+                checkbox.form.append(fallback);
+            }
+        });
+    });
 });
