@@ -11,6 +11,8 @@ use Illuminate\View\View;
 class MediaController extends Controller
 {
     public function index(): View { return view('admin.media.index', ['media' => Media::latest()->paginate(24)]); }
+
+    public function picker(): View { return view('admin.media.partials.picker', ['media' => Media::latest()->paginate(12)]); }
     public function store(Request $request): RedirectResponse
     {
         $request->validate(['images' => ['required','array','max:10'], 'images.*' => ['required','image','mimes:jpg,jpeg,png,webp,gif','max:4096']]);

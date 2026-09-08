@@ -1,4 +1,4 @@
-import 'bootstrap';
+import { Modal } from 'bootstrap';
 import $ from 'jquery';
 import select2 from 'select2';
 import '../css/app.css';
@@ -24,4 +24,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     $('.js-category-select').select2({ placeholder: 'Select one or more categories', width: '100%' });
+
+    const pickerModal = document.querySelector('#media-picker-modal');
+    const pickerContent = document.querySelector('#media-picker-content');
+    let activeMediaTarget = null;
+
+    const loadMediaPage = async (url) => {
+        pickerContent.innerHTML = '<div class="text-center py-5" style="color:var(--muted)"><div class="spinner-border spinner-border-sm me-2"></div>Loading media...</div>';
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        pickerContent.innerHTML = await response.text();
+    };
+
+    document.querySelectorAll('[data-media-picker-target]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            activeMediaTarget = button.dataset.mediaPickerTarget;
+            await loadMediaPage('/admin/media/picker');
+            Modal.getOrCreateInstance(pickerModal).show();
+        });
+    });
+
+    pickerContent?.addEventListener('click', async (event) => {
+        const page = event.target.closest('[data-media-page]');
+        if (page) { event.preventDefault(); await loadMediaPage(page.href); return; }
+        const choice = event.target.closest('[data-select-media]');
+        if (!choice || !activeMediaTarget) return;
+        const mediaInput = document.querySelector(`#${activeMediaTarget}`);
+        if (mediaInput) {
+            mediaInput.value = choice.dataset.selectMedia;
+            mediaInput.setAttribute('value', choice.dataset.selectMedia);
+        }
+        const preview = document.querySelector(`[data-media-preview="${activeMediaTarget}"]`);
+        if (preview) {
+            const image = document.createElement('img');
+            image.src = choice.dataset.mediaUrl;
+            image.alt = choice.dataset.mediaName;
+            preview.replaceChildren(image);
+        }
+        const label = document.querySelector(`[data-media-label="${activeMediaTarget}"]`);
+        if (label) label.textContent = choice.dataset.mediaName;
+        Modal.getOrCreateInstance(pickerModal).hide();
+    });
 });

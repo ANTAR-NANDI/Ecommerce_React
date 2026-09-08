@@ -17,13 +17,17 @@
             <p class="nav-label">Workspace</p>
             <a href="{{ route('admin.dashboard') }}" class="side-link active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
             <a href="#" class="side-link"><i class="bi bi-receipt"></i> Orders <span class="badge rounded-pill ms-auto" style="background:var(--brand-soft);color:var(--brand)">12</span></a>
-            <a href="#" class="side-link"><i class="bi bi-box-seam"></i> Products <i class="bi bi-chevron-down"></i></a>
-            <a href="{{ route('admin.categories.index') }}" class="side-link"><i class="bi bi-grid-3x3-gap-fill"></i> Category <i class="bi bi-chevron-down"></i></a>
+            <a href="#" class="side-link"><i class="bi bi-box-seam"></i> Products</a>
+            <button class="side-link border-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#dashboard-variant-menu" aria-expanded="false"><i class="bi bi-boxes"></i> Product Variant <i class="bi bi-chevron-down"></i></button>
+            <div id="dashboard-variant-menu" class="collapse"><div class="ms-4 border-start" style="border-color:var(--line)!important"><a href="#" class="side-link py-2">Brand</a><a href="#" class="side-link py-2">Color</a><a href="#" class="side-link py-2">Size</a><a href="#" class="side-link py-2">Unit</a></div></div>
+            <button class="side-link border-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#dashboard-category-menu" aria-expanded="false"><i class="bi bi-grid-3x3-gap-fill"></i> Category <i class="bi bi-chevron-down"></i></button>
+            <div id="dashboard-category-menu" class="collapse">
             <div class="ms-4 border-start" style="border-color:var(--line)!important">
                 <a href="{{ route('admin.categories.index') }}" class="side-link py-2">All category</a>
                 <a href="{{ route('admin.categories.create') }}" class="side-link py-2">Add category</a>
                 <a href="{{ route('admin.subcategories.index') }}" class="side-link py-2">All subcategory</a>
                 <a href="{{ route('admin.subcategories.create') }}" class="side-link py-2">Add subcategory</a>
+            </div>
             </div>
             <a href="#" class="side-link"><i class="bi bi-people"></i> Customers</a>
             <p class="nav-label">Operations</p>

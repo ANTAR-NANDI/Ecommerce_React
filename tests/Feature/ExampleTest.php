@@ -54,4 +54,32 @@ class ExampleTest extends TestCase
         $subcategory = Subcategory::where('slug', 'mobile-accessories')->firstOrFail();
         $this->assertCount(2, $subcategory->categories);
     }
+
+    public function test_a_category_can_be_updated(): void
+    {
+        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics', 'display_order' => 1, 'is_active' => true]);
+
+        $response = $this->put(route('admin.categories.update', $category), [
+            'name' => 'Consumer electronics',
+            'display_order' => 3,
+            'is_active' => 0,
+        ]);
+
+        $response->assertRedirect(route('admin.categories.index'));
+        $this->assertDatabaseHas('categories', ['id' => $category->id, 'name' => 'Consumer electronics', 'slug' => 'consumer-electronics', 'is_active' => 0]);
+    }
+
+    public function test_a_category_can_be_deleted_without_deleting_its_subcategory(): void
+    {
+        $category = Category::create(['name' => 'Electronics', 'slug' => 'electronics', 'display_order' => 1, 'is_active' => true]);
+        $subcategory = Subcategory::create(['name' => 'Cables', 'slug' => 'cables']);
+        $subcategory->categories()->attach($category);
+
+        $response = $this->delete(route('admin.categories.destroy', $category));
+
+        $response->assertRedirect(route('admin.categories.index'));
+        $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+        $this->assertDatabaseHas('subcategories', ['id' => $subcategory->id]);
+        $this->assertDatabaseMissing('category_subcategory', ['category_id' => $category->id]);
+    }
 }

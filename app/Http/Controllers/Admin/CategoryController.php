@@ -13,12 +13,28 @@ use Illuminate\View\View;
 class CategoryController extends Controller
 {
     public function index(): View { return view('admin.categories.index', ['categories' => Category::with(['icon', 'banner'])->orderBy('display_order')->paginate(12)]); }
-    public function create(): View { return view('admin.categories.create', ['media' => Media::latest()->get()]); }
+    public function create(): View { return view('admin.categories.create', ['media' => Media::latest()->get(), 'category' => new Category(['is_active' => true])]); }
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => ['required','string','max:100','unique:categories,name'], 'display_order' => ['required','integer','min:0'], 'icon_media_id' => ['nullable','exists:media,id'], 'banner_media_id' => ['nullable','exists:media,id'], 'is_active' => ['required','boolean']]);
         $data['slug'] = Str::slug($data['name']);
         Category::create($data);
         return to_route('admin.categories.index')->with('success', 'Category created successfully.');
+    }
+
+    public function edit(Category $category): View { return view('admin.categories.create', ['media' => Media::latest()->get(), 'category' => $category->load(['icon', 'banner'])]); }
+
+    public function update(Request $request, Category $category): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required','string','max:100','unique:categories,name,'.$category->id], 'display_order' => ['required','integer','min:0'], 'icon_media_id' => ['nullable','exists:media,id'], 'banner_media_id' => ['nullable','exists:media,id'], 'is_active' => ['required','boolean']]);
+        $data['slug'] = Str::slug($data['name']);
+        $category->update($data);
+        return to_route('admin.categories.index')->with('success', 'Category updated successfully.');
+    }
+
+    public function destroy(Category $category): RedirectResponse
+    {
+        $category->delete();
+        return to_route('admin.categories.index')->with('success', 'Category deleted. Its media files were kept in the Media Library.');
     }
 }

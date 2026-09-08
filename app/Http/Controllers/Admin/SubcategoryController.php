@@ -14,12 +14,28 @@ use Illuminate\View\View;
 class SubcategoryController extends Controller
 {
     public function index(): View { return view('admin.subcategories.index', ['subcategories' => Subcategory::with(['categories', 'icon'])->latest()->paginate(12)]); }
-    public function create(): View { return view('admin.subcategories.create', ['categories' => Category::where('is_active', true)->orderBy('name')->get(), 'media' => Media::latest()->get()]); }
+    public function create(): View { return view('admin.subcategories.create', ['categories' => Category::where('is_active', true)->orderBy('name')->get(), 'media' => Media::latest()->get(), 'subcategory' => new Subcategory()]); }
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => ['required','string','max:100','unique:subcategories,name'], 'categories' => ['required','array','min:1'], 'categories.*' => ['exists:categories,id'], 'short_description' => ['nullable','string','max:255'], 'icon_media_id' => ['nullable','exists:media,id']]);
         $subcategory = Subcategory::create(['name' => $data['name'], 'slug' => Str::slug($data['name']), 'short_description' => $data['short_description'] ?? null, 'icon_media_id' => $data['icon_media_id'] ?? null]);
         $subcategory->categories()->sync($data['categories']);
         return to_route('admin.subcategories.index')->with('success', 'Subcategory created successfully.');
+    }
+
+    public function edit(Subcategory $subcategory): View { return view('admin.subcategories.create', ['categories' => Category::where('is_active', true)->orderBy('name')->get(), 'media' => Media::latest()->get(), 'subcategory' => $subcategory->load(['categories', 'icon'])]); }
+
+    public function update(Request $request, Subcategory $subcategory): RedirectResponse
+    {
+        $data = $request->validate(['name' => ['required','string','max:100','unique:subcategories,name,'.$subcategory->id], 'categories' => ['required','array','min:1'], 'categories.*' => ['exists:categories,id'], 'short_description' => ['nullable','string','max:255'], 'icon_media_id' => ['nullable','exists:media,id']]);
+        $subcategory->update(['name' => $data['name'], 'slug' => Str::slug($data['name']), 'short_description' => $data['short_description'] ?? null, 'icon_media_id' => $data['icon_media_id'] ?? null]);
+        $subcategory->categories()->sync($data['categories']);
+        return to_route('admin.subcategories.index')->with('success', 'Subcategory updated successfully.');
+    }
+
+    public function destroy(Subcategory $subcategory): RedirectResponse
+    {
+        $subcategory->delete();
+        return to_route('admin.subcategories.index')->with('success', 'Subcategory deleted. Its media files were kept in the Media Library.');
     }
 }
