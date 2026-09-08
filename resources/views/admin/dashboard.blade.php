@@ -18,7 +18,13 @@
             <a href="{{ route('admin.dashboard') }}" class="side-link active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
             <a href="#" class="side-link"><i class="bi bi-receipt"></i> Orders <span class="badge rounded-pill ms-auto" style="background:var(--brand-soft);color:var(--brand)">12</span></a>
             <a href="#" class="side-link"><i class="bi bi-box-seam"></i> Products <i class="bi bi-chevron-down"></i></a>
-            <a href="#" class="side-link"><i class="bi bi-tags"></i> Categories</a>
+            <a href="{{ route('admin.categories.index') }}" class="side-link"><i class="bi bi-grid-3x3-gap-fill"></i> Category <i class="bi bi-chevron-down"></i></a>
+            <div class="ms-4 border-start" style="border-color:var(--line)!important">
+                <a href="{{ route('admin.categories.index') }}" class="side-link py-2">All category</a>
+                <a href="{{ route('admin.categories.create') }}" class="side-link py-2">Add category</a>
+                <a href="{{ route('admin.subcategories.index') }}" class="side-link py-2">All subcategory</a>
+                <a href="{{ route('admin.subcategories.create') }}" class="side-link py-2">Add subcategory</a>
+            </div>
             <a href="#" class="side-link"><i class="bi bi-people"></i> Customers</a>
             <p class="nav-label">Operations</p>
             <a href="#" class="side-link"><i class="bi bi-truck"></i> Delivery</a>

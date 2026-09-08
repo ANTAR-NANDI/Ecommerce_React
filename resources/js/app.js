@@ -1,5 +1,9 @@
 import 'bootstrap';
+import $ from 'jquery';
+import select2 from 'select2';
 import '../css/app.css';
+
+select2(window, $);
 
 const root = document.documentElement;
 const savedTheme = localStorage.getItem('admin-theme') || 'light';
@@ -18,4 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('[data-admin-theme]').forEach((item) => item.classList.toggle('active', item === option));
         });
     });
+
+    $('.js-category-select').select2({ placeholder: 'Select one or more categories', width: '100%' });
 });
