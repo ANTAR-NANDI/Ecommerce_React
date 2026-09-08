@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\SizeController;
 use App\Http\Controllers\Admin\UnitController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\Admin\PurchaseController;
+use App\Http\Controllers\Admin\PosController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -18,10 +20,17 @@ Route::get('/', function () {
 Route::view('/admin', 'admin.dashboard')->name('admin.dashboard');
 
 Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('pos', [PosController::class,'index'])->name('pos.index');
+    Route::get('purchases', [PurchaseController::class,'index'])->name('purchases.index');
+    Route::get('purchases/create', [PurchaseController::class,'create'])->name('purchases.create');
+    Route::post('purchases', [PurchaseController::class,'store'])->name('purchases.store');
     Route::resource('warehouses', WarehouseController::class)->except('show');
     Route::get('products', [ProductController::class, 'index'])->name('products.index');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
     Route::post('products', [ProductController::class, 'store'])->name('products.store');
+    Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+    Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
+    Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::resource('brands', BrandController::class)->except('show');
     Route::resource('colors', ColorController::class)->except('show');
     Route::resource('sizes', SizeController::class)->except('show');

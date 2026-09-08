@@ -83,4 +83,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    const purchaseLines = document.querySelector('#purchase-lines tbody');
+    const refreshPurchaseTotals = () => {
+        let subtotal = 0;
+        purchaseLines?.querySelectorAll('tr').forEach((row) => {
+            const total = (parseFloat(row.querySelector('.line-qty')?.value) || 0) * (parseFloat(row.querySelector('.line-cost')?.value) || 0);
+            subtotal += total;
+            row.querySelector('.line-total').textContent = `$${total.toFixed(2)}`;
+        });
+        const discount = parseFloat(document.querySelector('[name="discount"]')?.value) || 0;
+        const tax = parseFloat(document.querySelector('[name="tax"]')?.value) || 0;
+        document.querySelector('#purchase-grand-total')?.replaceChildren(`$${(subtotal - discount + tax).toFixed(2)}`);
+    };
+    const namePurchaseFields = () => purchaseLines?.querySelectorAll('tr').forEach((row, index) => {
+        row.querySelector('.product-select').name = `items[${index}][product_id]`;
+        row.querySelector('.product-name').name = `items[${index}][product_name]`;
+        row.querySelector('.line-qty').name = `items[${index}][quantity]`;
+        row.querySelector('.line-cost').name = `items[${index}][unit_cost]`;
+    });
+    document.querySelector('#add-purchase-line')?.addEventListener('click', () => { purchaseLines.append(document.querySelector('#purchase-line-template').content.cloneNode(true)); namePurchaseFields(); refreshPurchaseTotals(); });
+    purchaseLines?.addEventListener('input', refreshPurchaseTotals);
+    purchaseLines?.addEventListener('change', (event) => { if (event.target.matches('.product-select')) { const option = event.target.selectedOptions[0]; const name = event.target.closest('td').querySelector('.product-name'); if (option?.dataset.name) name.value = option.dataset.name; } refreshPurchaseTotals(); });
+    purchaseLines?.addEventListener('click', (event) => { if (event.target.closest('.remove-line') && purchaseLines.rows.length > 1) { event.target.closest('tr').remove(); namePurchaseFields(); refreshPurchaseTotals(); } });
+    namePurchaseFields();
+    refreshPurchaseTotals();
+
+    const posCart = new Map();
+    const renderPosCart = () => {
+        const cart = document.querySelector('#pos-cart'); if (!cart) return;
+        const rows = [...posCart.values()]; const total = rows.reduce((sum,item)=>sum+item.price*item.quantity,0);
+        cart.innerHTML = rows.length ? rows.map(item => `<div class="d-flex align-items-center gap-2"><div class="flex-grow-1"><div class="fw-semibold small">${item.name}</div><div class="small" style="color:var(--brand)">$${item.price.toFixed(2)}</div></div><div class="input-group input-group-sm" style="width:95px"><button class="btn btn-outline-secondary pos-quantity" data-id="${item.id}" data-change="-1">−</button><span class="input-group-text bg-white">${item.quantity}</span><button class="btn btn-outline-secondary pos-quantity" data-id="${item.id}" data-change="1">+</button></div></div>`).join('') : '<div class="text-center py-5 text-muted"><i class="bi bi-basket fs-2 d-block mb-2"></i>Cart is empty</div>';
+        document.querySelector('#pos-subtotal')?.replaceChildren(`$${total.toFixed(2)}`); document.querySelector('#pos-total')?.replaceChildren(`$${total.toFixed(2)}`);
+    };
+    document.querySelector('#pos-products')?.addEventListener('click', (event) => { const button=event.target.closest('.pos-add'); if(!button)return; const item=posCart.get(button.dataset.id)||{id:button.dataset.id,name:button.dataset.name,price:parseFloat(button.dataset.price),quantity:0}; item.quantity++; posCart.set(item.id,item); renderPosCart(); });
+    document.querySelector('#pos-cart')?.addEventListener('click',(event)=>{const button=event.target.closest('.pos-quantity');if(!button)return;const item=posCart.get(button.dataset.id);item.quantity+=parseInt(button.dataset.change);if(item.quantity<1)posCart.delete(item.id);renderPosCart();});
+    document.querySelector('#pos-clear')?.addEventListener('click',()=>{posCart.clear();renderPosCart();});
+    document.querySelector('#pos-search')?.addEventListener('input',(event)=>document.querySelectorAll('.pos-product').forEach(card=>card.classList.toggle('d-none',!card.dataset.name.includes(event.target.value.toLowerCase()))));
 });
