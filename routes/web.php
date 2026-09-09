@@ -33,6 +33,8 @@ use App\Http\Controllers\Admin\CmsFooterController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\CustomerAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -57,6 +59,31 @@ Route::view('blogs', 'storefront')->name('blogs.public.index.view');
 Route::view('blogs/{slug}', 'storefront')->name('blogs.public');
 Route::get('api/pages/{slug}', [PublicCmsPageController::class, 'data'])->name('pages.public.data');
 Route::view('page/{slug}', 'storefront')->name('pages.public');
+
+Route::middleware('guest:customer')->group(function () {
+    Route::get('customer/login', [CustomerAuthController::class, 'create'])->name('customer.login');
+    Route::post('customer/login', [CustomerAuthController::class, 'store'])->name('customer.login.store');
+    Route::get('customer/signup', [CustomerAuthController::class, 'register'])->name('customer.signup');
+    Route::post('customer/signup', [CustomerAuthController::class, 'storeRegistration'])->name('customer.signup.store');
+});
+Route::middleware('auth:customer')->group(function () {
+    Route::post('customer/logout', [CustomerAuthController::class, 'destroy'])->name('customer.logout');
+    Route::get('account', [CustomerAccountController::class, 'dashboard'])->name('customer.dashboard');
+    Route::get('account/orders', [CustomerAccountController::class, 'orders'])->name('customer.orders');
+    Route::get('account/orders/{order}', [CustomerAccountController::class, 'order'])->name('customer.orders.show');
+    Route::get('account/wishlist', [CustomerAccountController::class, 'wishlist'])->name('customer.wishlist');
+    Route::get('account/profile', [CustomerAccountController::class, 'profile'])->name('customer.profile');
+    Route::put('account/profile', [CustomerAccountController::class, 'updateProfile'])->name('customer.profile.update');
+    Route::put('account/password', [CustomerAccountController::class, 'updatePassword'])->name('customer.password.update');
+    Route::get('account/change-password', [CustomerAccountController::class, 'changePassword'])->name('customer.password');
+    Route::get('account/addresses', [CustomerAccountController::class, 'addresses'])->name('customer.addresses');
+    Route::post('account/addresses', [CustomerAccountController::class, 'storeAddress'])->name('customer.addresses.store');
+    Route::put('account/addresses/{address}', [CustomerAccountController::class, 'updateAddress'])->name('customer.addresses.update');
+    Route::delete('account/addresses/{address}', [CustomerAccountController::class, 'deleteAddress'])->name('customer.addresses.destroy');
+    Route::get('api/customer/wishlist', [CustomerAccountController::class, 'wishlistData'])->name('customer.wishlist.data');
+    Route::post('api/customer/wishlist/{product}', [CustomerAccountController::class, 'addWishlist'])->name('customer.wishlist.add');
+    Route::delete('api/customer/wishlist/{product}', [CustomerAccountController::class, 'removeWishlist'])->name('customer.wishlist.remove');
+});
 
 Route::middleware('guest')->group(function () { Route::get('login', [LoginController::class,'create'])->name('login'); Route::post('login', [LoginController::class,'store'])->name('login.store'); });
 Route::post('logout', [LoginController::class,'destroy'])->middleware('auth')->name('logout');

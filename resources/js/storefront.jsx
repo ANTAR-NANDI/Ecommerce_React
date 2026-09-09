@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/storefront.css';
+import '../css/product-options.css';
 
 const fallback = {
     categories: [], products: [], flash_products: [], banners: [], blogs: [], contact: {}, menus: {}, footer: {}, flash_deal: null,
@@ -8,6 +9,15 @@ const fallback = {
 
 const money = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
 const iconFor = (name) => ({ Electronics: 'bi-phone', Fashion: 'bi-handbag', Beauty: 'bi-flower1', Home: 'bi-house-heart', Grocery: 'bi-basket2', Toys: 'bi-rocket-takeoff', Sports: 'bi-bicycle', Jewelry: 'bi-gem' })[Object.keys({ Electronics: 1, Fashion: 1, Beauty: 1, Home: 1, Grocery: 1, Toys: 1, Sports: 1, Jewelry: 1 }).find((key) => name?.includes(key))] || 'bi-grid';
+const wishlistKey = 'velora-wishlist';
+const readWishlist = () => { try { return JSON.parse(window.localStorage.getItem(wishlistKey) || '[]'); } catch { return []; } };
+const toggleStoredWishlist = (product) => {
+    const current = readWishlist();
+    const next = current.some((item) => item.id === product.id) ? current.filter((item) => item.id !== product.id) : [...current, product];
+    window.localStorage.setItem(wishlistKey, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('velora-wishlist-change', { detail: { items: next, product, saved: next.some((item) => item.id === product.id) } }));
+    return next.some((item) => item.id === product.id);
+};
 
 function Brand({ title = null }) {
     return <a href="/" className="shop-brand" aria-label="VeloraCommerce home"><span className="shop-brand-icon"><i className="bi bi-bag-heart-fill" /></span><span>{title || <><span>Velora</span><br /><b>Commerce</b></>}</span></a>;
@@ -37,8 +47,11 @@ function ProductImage({ product }) {
 }
 
 function ProductCard({ product, addToCart, compact = false }) {
+    const [saved, setSaved] = useState(() => readWishlist().some((item) => item.id === product.id));
+    useEffect(() => setSaved(readWishlist().some((item) => item.id === product.id)), [product.id]);
+    const toggleWishlist = () => setSaved(toggleStoredWishlist(product));
     return <article className={`store-product ${compact ? 'store-product-compact' : ''}`}>
-        <button className="wish-button" aria-label={`Save ${product.name}`}><i className="bi bi-heart" /></button>
+        <button className={saved ? 'wish-button active' : 'wish-button'} onClick={toggleWishlist} aria-label={`${saved ? 'Remove' : 'Save'} ${product.name} ${saved ? 'from' : 'to'} wishlist`}><i className={`bi bi-heart${saved ? '-fill' : ''}`} /></button>
         {product.discount > 0 && <span className="offer-badge">{product.discount}% OFF</span>}
         <div className="product-image"><a href={`/products/${product.slug}`}><ProductImage product={product} /></a></div>
         <div className="product-details">
@@ -75,15 +88,31 @@ function ProductGallery({ product }) {
 
 function ProductDetail({ product, loading, addToCart }) {
     const [quantity, setQuantity] = useState(1);
-    useEffect(() => setQuantity(1), [product?.id]);
+    const sizes = product?.sizes?.length ? product.sizes : product?.size ? [product.size] : [];
+    const colors = product?.colors?.length ? product.colors : product?.color ? [{ name: product.color, hex_code: null }] : [];
+    const [selectedSize, setSelectedSize] = useState('');
+    const [selectedColor, setSelectedColor] = useState('');
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        setQuantity(1);
+        setSelectedSize(sizes[0] || '');
+        setSelectedColor(colors[0]?.name || '');
+        setSaved(product ? readWishlist().some((item) => item.id === product.id) : false);
+    }, [product?.id]);
+
     if (loading) return <div className="detail-loading">Loading product…</div>;
     if (!product) return <div className="detail-loading"><i className="bi bi-exclamation-circle" /><p>We could not find this product.</p><a href="/">Return to shop</a></div>;
-    const add = () => { for (let index = 0; index < quantity; index += 1) addToCart(product); };
-    return <div className="detail-page"><div className="breadcrumbs"><a href="/"><i className="bi bi-house" /> Home</a><i className="bi bi-chevron-right" /><a href="/products">{product.category || 'Products'}</a><i className="bi bi-chevron-right" /><span>{product.name}</span></div><section className="detail-top"><ProductGallery product={product} /><div className="detail-info"><p className="detail-brand">{product.brand || product.category || 'Velora selection'}</p><div className="detail-title-row"><h1>{product.name}</h1><div><button aria-label="Add to wishlist"><i className="bi bi-heart" /></button><button aria-label="Share product"><i className="bi bi-share" /></button></div></div><p className="detail-short">{product.short_description || 'A carefully selected product with quality you can count on.'}</p><div className="detail-rating"><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /> <b>4.8</b><span>(12 reviews)</span><em>|</em><span>{product.stock || 0} available</span></div><div className="detail-price"><strong>{money(product.price)}</strong>{product.original_price && <del>{money(product.original_price)}</del>}</div><div className="detail-options">{product.size && <div><span>Size:</span><button className="selected">{product.size}</button></div>}{product.color && <div><span>Color:</span><button className="selected">{product.color}</button></div>}{product.unit && <div><span>Unit:</span><button>{product.unit}</button></div>}</div><div className="detail-quantity"><span>Quantity:</span><div><button onClick={() => setQuantity((current) => Math.max(1, current - 1))}>−</button><b>{quantity}</b><button onClick={() => setQuantity((current) => Math.min(product.stock || 1, current + 1))}>+</button></div><em className={product.stock ? 'available' : ''}>{product.stock ? 'In Stock' : 'Out of Stock'}</em></div><div className="detail-buy-actions"><button onClick={add} disabled={!product.stock}>Add to Cart</button><button onClick={add} disabled={!product.stock}>Buy Now</button></div><div className="detail-store"><i className="bi bi-patch-check-fill" /><div><small>Sold by</small><b>VeloraCommerce</b></div><span><i className="bi bi-truck" /> Estimated delivery: 3–4 days</span></div></div></section><section className="detail-description"><div className="description-tabs"><button className="active">Description</button><button>Reviews <small>(12)</small></button></div><div><h2>Summary</h2><p>{product.description || product.short_description || 'This product is designed to provide a practical, reliable and user-friendly solution for everyday needs.'}</p><h3>Key Features</h3><ul><li>Premium quality selected for everyday use</li><li>Reliable value with carefully checked product details</li><li>Simple, secure checkout and delivery support</li></ul></div></section></div>;
+    const add = () => {
+        const selectedProduct = { ...product, size: selectedSize || product.size, color: selectedColor || product.color };
+        for (let index = 0; index < quantity; index += 1) addToCart(selectedProduct);
+    };
+    const toggleWishlist = () => setSaved(toggleStoredWishlist(product));
+    return <div className="detail-page"><div className="breadcrumbs"><a href="/"><i className="bi bi-house" /> Home</a><i className="bi bi-chevron-right" /><a href="/products">{product.category || 'Products'}</a><i className="bi bi-chevron-right" /><span>{product.name}</span></div><section className="detail-top"><ProductGallery product={product} /><div className="detail-info"><p className="detail-brand">{product.brand || product.category || 'Velora selection'}</p><div className="detail-title-row"><h1>{product.name}</h1><div><button className={saved ? 'active' : ''} onClick={() => toggleWishlist(product)} aria-label={`${saved ? 'Remove from' : 'Add to'} wishlist`}><i className={`bi bi-heart${saved ? '-fill' : ''}`} /></button><button aria-label="Share product"><i className="bi bi-share" /></button></div></div><p className="detail-short">{product.short_description || 'A carefully selected product with quality you can count on.'}</p><div className="detail-rating"><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /><i className="bi bi-star-fill" /> <b>4.8</b><span>(12 reviews)</span><em>|</em><span>{product.stock || 0} available</span></div><div className="detail-price"><strong>{money(product.price)}</strong>{product.original_price && <del>{money(product.original_price)}</del>}</div><div className="detail-options">{sizes.length > 0 && <div><span>Size:</span><div className="detail-option-values">{sizes.map((size) => <button key={size} type="button" className={selectedSize === size ? 'selected' : ''} onClick={() => setSelectedSize(size)}>{size}</button>)}</div></div>}{colors.length > 0 && <div><span>Color:</span><div className="detail-option-values">{colors.map((color) => <button key={color.name} type="button" className={selectedColor === color.name ? 'selected color-choice' : 'color-choice'} onClick={() => setSelectedColor(color.name)}><i style={color.hex_code ? { backgroundColor: color.hex_code } : undefined} />{color.name}</button>)}</div></div>}{product.unit && <div><span>Unit:</span><button type="button">{product.unit}</button></div>}</div><div className="detail-quantity"><span>Quantity:</span><div><button onClick={() => setQuantity((current) => Math.max(1, current - 1))}>−</button><b>{quantity}</b><button onClick={() => setQuantity((current) => Math.min(product.stock || 1, current + 1))}>+</button></div><em className={product.stock ? 'available' : ''}>{product.stock ? 'In Stock' : 'Out of Stock'}</em></div><div className="detail-buy-actions"><button onClick={add} disabled={!product.stock}>Add to Cart</button><button onClick={add} disabled={!product.stock}>Buy Now</button></div><div className="detail-store"><i className="bi bi-patch-check-fill" /><div><small>Sold by</small><b>VeloraCommerce</b></div><span><i className="bi bi-truck" /> Estimated delivery: 3–4 days</span></div></div></section><section className="detail-description"><div className="description-tabs"><button className="active">Description</button><button>Reviews <small>(12)</small></button></div><div><h2>Summary</h2><p>{product.description || product.short_description || 'This product is designed to provide a practical, reliable and user-friendly solution for everyday needs.'}</p><h3>Key Features</h3><ul><li>Premium quality selected for everyday use</li><li>Reliable value with carefully checked product details</li><li>Simple, secure checkout and delivery support</li></ul></div></section></div>;
 }
 
-function Catalog({ search, addToCart, initialBrand, initialCategory }) {
-    const initialFilters = { search: '', min_price: '', max_price: '', categories: initialCategory ? [Number(initialCategory)] : [], brands: initialBrand ? [Number(initialBrand)] : [], colors: [], sizes: [], in_stock: false, sort: 'newest', page: 1 };
+function Catalog({ search, addToCart, wishlist, toggleWishlist, initialBrand, initialCategory, initialSubcategory }) {
+    const initialFilters = { search: '', min_price: '', max_price: '', categories: initialCategory ? [Number(initialCategory)] : [], subcategories: initialSubcategory ? [Number(initialSubcategory)] : [], brands: initialBrand ? [Number(initialBrand)] : [], colors: [], sizes: [], in_stock: false, sort: 'newest', page: 1 };
     const [filters, setFilters] = useState(initialFilters);
     const [pendingFilters, setPendingFilters] = useState(initialFilters);
     const [catalog, setCatalog] = useState({ products: { data: [], current_page: 1, last_page: 1, total: 0 }, filters: { categories: [], brands: [], colors: [], sizes: [] } });
@@ -96,7 +125,7 @@ function Catalog({ search, addToCart, initialBrand, initialCategory }) {
         fetch(`/api/products?${params.toString()}`).then((response) => response.ok ? response.json() : Promise.reject()).then(setCatalog).catch(() => setCatalog((current) => ({ ...current, products: { data: [] } }))).finally(() => setLoading(false));
     }, [filters]);
     const toggle = (name, id) => setPendingFilters((current) => ({ ...current, [name]: current[name].includes(id) ? current[name].filter((value) => value !== id) : [...current[name], id] }));
-    const reset = () => { const cleared = { search: '', min_price: '', max_price: '', categories: [], brands: [], colors: [], sizes: [], in_stock: false, sort: 'newest', page: 1 }; setFilters(cleared); setPendingFilters(cleared); };
+    const reset = () => { const cleared = { search: '', min_price: '', max_price: '', categories: [], subcategories: [], brands: [], colors: [], sizes: [], in_stock: false, sort: 'newest', page: 1 }; setFilters(cleared); setPendingFilters(cleared); };
     const applyFilters = () => { const next = { ...pendingFilters, page: 1 }; setPendingFilters(next); setFilters(next); };
     const page = catalog.products || { data: [] };
     const FilterGroup = ({ title, name, items, color = false }) => <details className="catalog-filter" open><summary>{title}<i className="bi bi-chevron-up" /></summary><div>{items.length ? items.map((item) => <label key={item.id} className={color ? 'color-filter' : ''}><input type="checkbox" checked={pendingFilters[name].includes(item.id)} onChange={() => toggle(name, item.id)} />{color && <i style={{ background: item.hex_code || '#cbd5e1' }} />}{item.name}</label>) : <small>No options yet</small>}</div></details>;
@@ -153,6 +182,7 @@ function App() {
     const isBlogs = window.location.pathname === '/blogs';
     const selectedBrandId = new URLSearchParams(window.location.search).get('brand');
     const selectedCatalogCategoryId = new URLSearchParams(window.location.search).get('category');
+    const selectedCatalogSubcategoryId = new URLSearchParams(window.location.search).get('subcategory');
     const selectedCatalogSearch = new URLSearchParams(window.location.search).get('search') || '';
     const [data, setData] = useState(fallback);
     const [loading, setLoading] = useState(true);
@@ -161,13 +191,46 @@ function App() {
     const [query, setQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
     const [cart, setCart] = useState(() => { try { return JSON.parse(window.localStorage.getItem('velora-cart') || '[]'); } catch { return []; } });
+    const [wishlist, setWishlist] = useState(readWishlist);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [activeMenuCategoryId, setActiveMenuCategoryId] = useState(null);
     const [cartOpen, setCartOpen] = useState(false);
 
     useEffect(() => {
         fetch('/api/storefront').then((response) => response.ok ? response.json() : Promise.reject()).then(setData).catch(() => setData(fallback)).finally(() => setLoading(false));
     }, []);
     useEffect(() => { window.localStorage.setItem('velora-cart', JSON.stringify(cart)); }, [cart]);
+    useEffect(() => {
+        const syncWishlist = (event) => setWishlist(event.detail?.items || readWishlist());
+        window.addEventListener('velora-wishlist-change', syncWishlist);
+        return () => window.removeEventListener('velora-wishlist-change', syncWishlist);
+    }, []);
+    useEffect(() => {
+        const count = document.querySelector('.header-actions > button[aria-label="Wishlist"] b');
+        if (count) count.textContent = String(wishlist.length);
+    }, [wishlist]);
+    useEffect(() => {
+        const accountLink = document.querySelector('.header-actions > a[aria-label="Account"]');
+        if (accountLink) accountLink.href = data.customer?.dashboard_url || '/customer/login';
+        const wishlistButton = document.querySelector('.header-actions > button[aria-label="Wishlist"]');
+        const openWishlist = () => { window.location.href = data.customer ? '/account/wishlist' : '/customer/login'; };
+        wishlistButton?.addEventListener('click', openWishlist);
+        if (!data.customer) return () => wishlistButton?.removeEventListener('click', openWishlist);
+        fetch('/api/customer/wishlist', { headers: { Accept: 'application/json' } }).then((response) => response.ok ? response.json() : Promise.reject()).then((items) => {
+            window.localStorage.setItem(wishlistKey, JSON.stringify(items));
+            setWishlist(items);
+        }).catch(() => {});
+        return () => wishlistButton?.removeEventListener('click', openWishlist);
+    }, [data.customer]);
+    useEffect(() => {
+        const saveCustomerWishlist = (event) => {
+            if (!data.customer || !event.detail?.product) return;
+            const { product, saved } = event.detail;
+            fetch(`/api/customer/wishlist/${product.id}`, { method: saved ? 'POST' : 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '', Accept: 'application/json' } }).catch(() => {});
+        };
+        window.addEventListener('velora-wishlist-change', saveCustomerWishlist);
+        return () => window.removeEventListener('velora-wishlist-change', saveCustomerWishlist);
+    }, [data.customer]);
     useEffect(() => {
         if (!productSlug) return;
         fetch(`/api/products/${encodeURIComponent(productSlug)}`).then((response) => response.ok ? response.json() : Promise.reject()).then((payload) => setProductDetail(payload.product)).catch(() => setProductDetail(null)).finally(() => setDetailLoading(false));
@@ -186,15 +249,16 @@ function App() {
     const contact = data.contact || {};
     const headerMenus = data.menus?.header?.length ? data.menus.header : [{ label: 'Home', url: '/' }, { label: 'Products', url: '/products' }, { label: 'Brands', url: '/brands' }, { label: 'Blogs', url: '/blogs' }, { label: 'Contact', url: '/contact-us' }];
     const footerMenus = (location, fallbackItems) => data.menus?.[location]?.length ? data.menus[location] : fallbackItems;
+    const activeMenuCategory = data.categories.find((category) => category.id === activeMenuCategoryId) || data.categories[0];
 
     return <div className="storefront">
         <div className="utility-bar"><div className="store-container utility-inner"><span><i className="bi bi-truck" /> Free delivery on orders over $99.00</span><div><span><i className="bi bi-lightning-charge" /> Daily Deals</span><span><i className="bi bi-arrow-repeat" /> Easy Returns</span><span><i className="bi bi-question-circle" /> Help Center</span></div><div><span>English <i className="bi bi-chevron-down" /></span><span>USD <i className="bi bi-chevron-down" /></span><i className="bi bi-moon" /></div></div></div>
 
         <header className="store-header store-container"><Brand /><form className="search-box" onSubmit={(event) => { event.preventDefault(); const params = new URLSearchParams(); if (query.trim()) params.set('search', query.trim()); const category = data.categories.find((item) => item.name === selectedCategory); if (category) params.set('category', category.id); window.location.href = `/products${params.size ? `?${params}` : ''}`; }}><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search for products, brands and more..." /><select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)}><option value="">All Categories</option>{data.categories.map((category) => <option value={category.name} key={category.id}>{category.name}</option>)}</select><button type="submit" aria-label="Search"><i className="bi bi-search" /></button></form><div className="header-actions"><button aria-label="Wishlist"><i className="bi bi-heart" /><b>0</b></button><button onClick={() => setCartOpen(true)} aria-label="Cart"><i className="bi bi-bag" /><b>{cartCount}</b></button><a href="/login" aria-label="Account"><i className="bi bi-person" /></a></div></header>
 
-        <nav className="main-nav store-container"><div className="category-dropdown"><button onClick={() => setMenuOpen((open) => !open)} className="category-trigger"><i className="bi bi-list" /> All Categories <i className={`bi bi-chevron-${menuOpen ? 'up' : 'down'} ms-auto`} /></button>{menuOpen && <div className="category-popover">{data.categories.map((category) => <button key={category.id} onClick={() => { setMenuOpen(false); window.location.href = `/products?category=${category.id}`; }}><span className="category-mini">{category.icon_url ? <img src={category.icon_url} alt="" /> : <i className={`bi ${iconFor(category.name)}`} />}</span>{category.name}<i className="bi bi-chevron-right" /></button>)}<a href="/products"><i className="bi bi-grid-3x3-gap" /> View All Categories</a></div>}</div><div className="nav-links">{headerMenus.map((menu) => <a key={`${menu.label}-${menu.url}`} href={menu.url} target={menu.open_in_new_tab ? '_blank' : undefined} rel={menu.open_in_new_tab ? 'noreferrer' : undefined} className={window.location.pathname === menu.url ? 'active' : ''}>{menu.label}</a>)}</div></nav>
+        <nav className="main-nav store-container"><div className="category-dropdown"><button onClick={() => setMenuOpen((open) => !open)} className="category-trigger"><i className="bi bi-list" /> All Categories <i className={`bi bi-chevron-${menuOpen ? 'up' : 'down'} ms-auto`} /></button>{menuOpen && <div className="category-popover category-mega-menu"><div className="category-menu-list">{data.categories.map((category) => <button key={category.id} onMouseEnter={() => setActiveMenuCategoryId(category.id)} onFocus={() => setActiveMenuCategoryId(category.id)} onClick={() => setActiveMenuCategoryId(category.id)} className={activeMenuCategory?.id === category.id ? 'active' : ''}><span className="category-mini">{category.icon_url ? <img src={category.icon_url} alt="" /> : <i className={`bi ${iconFor(category.name)}`} />}</span>{category.name}<i className="bi bi-chevron-right" /></button>)}<a href="/products"><i className="bi bi-grid-3x3-gap" /> View All Categories</a></div><section className="subcategory-menu-panel">{activeMenuCategory ? <><div><span className="category-mini">{activeMenuCategory.icon_url ? <img src={activeMenuCategory.icon_url} alt="" /> : <i className={`bi ${iconFor(activeMenuCategory.name)}`} />}</span><div><b>{activeMenuCategory.name}</b><small>Explore products in this category</small></div></div>{activeMenuCategory.subcategories?.length ? <div className="subcategory-menu-links">{activeMenuCategory.subcategories.map((subcategory) => <a key={subcategory.id} href={`/products?category=${activeMenuCategory.id}&subcategory=${subcategory.id}`} onClick={() => setMenuOpen(false)}>{subcategory.icon_url ? <img src={subcategory.icon_url} alt="" /> : <i className="bi bi-grid" />}<span>{subcategory.name}</span></a>)}</div> : <p>No subcategories have been added yet.</p>}<a className="view-category-link" href={`/products?category=${activeMenuCategory.id}`} onClick={() => setMenuOpen(false)}>View all {activeMenuCategory.name} <i className="bi bi-arrow-right" /></a></> : <p>No categories available yet.</p>}</section></div>}</div><div className="nav-links">{headerMenus.map((menu) => <a key={`${menu.label}-${menu.url}`} href={menu.url} target={menu.open_in_new_tab ? '_blank' : undefined} rel={menu.open_in_new_tab ? 'noreferrer' : undefined} className={window.location.pathname === menu.url ? 'active' : ''}>{menu.label}</a>)}</div></nav>
 
-        <main className="store-container">{productSlug ? <ProductDetail product={productDetail} loading={detailLoading} addToCart={addToCart} /> : blogSlug ? <BlogDetail slug={blogSlug} /> : pageSlug ? <DynamicPage slug={pageSlug} /> : isCheckout ? <CheckoutPage cart={cart} setCart={setCart} /> : isContact ? <ContactPage /> : isBlogs ? <BlogPage /> : isBrands ? <BrandDirectory /> : isCatalog ? <Catalog search={selectedCatalogSearch} initialBrand={selectedBrandId} initialCategory={selectedCatalogCategoryId} addToCart={addToCart} /> : <>
+        <main className="store-container">{productSlug ? <ProductDetail product={productDetail} loading={detailLoading} addToCart={addToCart} /> : blogSlug ? <BlogDetail slug={blogSlug} /> : pageSlug ? <DynamicPage slug={pageSlug} /> : isCheckout ? <CheckoutPage cart={cart} setCart={setCart} /> : isContact ? <ContactPage /> : isBlogs ? <BlogPage /> : isBrands ? <BrandDirectory /> : isCatalog ? <Catalog search={selectedCatalogSearch} initialBrand={selectedBrandId} initialCategory={selectedCatalogCategoryId} initialSubcategory={selectedCatalogSubcategoryId} addToCart={addToCart} /> : <>
             <section className="hero-grid"><aside className="desktop-category-list">{data.categories.slice(0, 8).map((category) => <button key={category.id} onClick={() => { window.location.href = `/products?category=${category.id}`; }}><span>{category.icon_url ? <img src={category.icon_url} alt="" /> : <i className={`bi ${iconFor(category.name)}`} />}</span>{category.name}<i className="bi bi-chevron-right" /></button>)}<a href="/products"><i className="bi bi-grid-3x3-gap" /> View All Categories</a></aside><div className="hero-main">{hero?.image_url ? <img src={hero.image_url} alt={hero.title} /> : <div className="hero-fallback"><p>NEW SEASON, NEW STYLE</p><h1>Find your<br /><em>everyday</em> favourite.</h1><span>Fresh products, fair prices and effortless delivery.</span><a href="/products">Shop Collection <i className="bi bi-arrow-right" /></a></div>} {hero?.image_url && <div className="hero-caption"><p>{hero.title}</p>{hero.description && <span>{hero.description}</span>}<a href={hero.link_url || '/products'}>Shop now <i className="bi bi-arrow-right" /></a></div>}</div><div className="hero-side">{promoTiles.length ? promoTiles.map((tile) => <a href={tile.link_url || '/products'} key={tile.id}>{tile.image_url ? <img src={tile.image_url} alt={tile.title} /> : <div><b>{tile.title}</b></div>}</a>) : <><div className="mini-promo blue"><span>UP TO</span><b>50%</b><strong>OFF</strong><p>Everyday care,<br />delivered gently.</p></div><div className="mini-promo green"><span>FLASH</span><b>SALE</b><p>Best picks, better prices.</p></div></>}</div></section>
             <section className="trust-strip"><div><i className="bi bi-shield-lock" /><p><b>Secure Payments</b><span>100% safe & trusted</span></p></div><div><i className="bi bi-truck" /><p><b>Free Delivery</b><span>On orders over $99</span></p></div><div><i className="bi bi-patch-check" /><p><b>100% Authentic</b><span>Genuine products only</span></p></div><div><i className="bi bi-headset" /><p><b>24/7 Support</b><span>We are always here</span></p></div><div><i className="bi bi-arrow-repeat" /><p><b>Easy Returns</b><span>Hassle free returns</span></p></div></section>
 

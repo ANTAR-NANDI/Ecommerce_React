@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
@@ -14,7 +15,9 @@ class Product extends Model
     public function category(): BelongsTo { return $this->belongsTo(Category::class); }
     public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
     public function color(): BelongsTo { return $this->belongsTo(Color::class); }
+    public function colors(): BelongsToMany { return $this->belongsToMany(Color::class)->withTimestamps(); }
     public function size(): BelongsTo { return $this->belongsTo(Size::class); }
+    public function sizes(): BelongsToMany { return $this->belongsToMany(Size::class)->withTimestamps(); }
     public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
     public function warehouseStocks(): HasMany { return $this->hasMany(WarehouseProductStock::class); }
 }

@@ -21,9 +21,9 @@ class PublicStorefrontController extends Controller
     public function data(): JsonResponse
     {
         $now = now();
-        $categories = Category::with(['icon', 'banner'])
+        $categories = Category::with(['icon', 'banner', 'subcategories.icon'])
             ->where('is_active', true)->orderBy('display_order')->get();
-        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size'])
+        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])
             ->where('is_active', true)->latest()->take(24)->get();
         $promotions = Promotion::with('banner')->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
@@ -36,6 +36,12 @@ class PublicStorefrontController extends Controller
             'categories' => $categories->map(fn (Category $category) => [
                 'id' => $category->id, 'name' => $category->name, 'slug' => $category->slug,
                 'icon_url' => $category->icon?->url, 'banner_url' => $category->banner?->url,
+                'subcategories' => $category->subcategories->sortBy('name')->values()->map(fn ($subcategory) => [
+                    'id' => $subcategory->id,
+                    'name' => $subcategory->name,
+                    'slug' => $subcategory->slug,
+                    'icon_url' => $subcategory->icon?->url,
+                ]),
             ]),
             'products' => $products->map(fn (Product $product) => $this->productPayload($product)),
             'flash_products' => $flashProducts->map(fn (Product $product) => $this->productPayload($product)),
@@ -54,6 +60,10 @@ class PublicStorefrontController extends Controller
                 'published_at' => $blog->published_at,
             ]),
             'contact' => ContactSetting::firstOrCreate(['id' => 1]),
+            'customer' => auth('customer')->check() ? [
+                'name' => auth('customer')->user()->full_name,
+                'dashboard_url' => route('customer.dashboard'),
+            ] : null,
             'menus' => CmsMenu::where('is_active', true)->orderBy('sort_order')->get()->groupBy('location'),
             'footer' => CmsFooterSetting::firstOrCreate(['id' => 1]),
         ]);
@@ -66,20 +76,28 @@ class PublicStorefrontController extends Controller
             'min_price' => ['nullable', 'numeric', 'min:0'],
             'max_price' => ['nullable', 'numeric', 'gte:min_price'],
             'categories' => ['nullable', 'array'], 'categories.*' => ['integer'],
+            'subcategories' => ['nullable', 'array'], 'subcategories.*' => ['integer'],
             'brands' => ['nullable', 'array'], 'brands.*' => ['integer'],
             'colors' => ['nullable', 'array'], 'colors.*' => ['integer'],
             'sizes' => ['nullable', 'array'], 'sizes.*' => ['integer'],
             'in_stock' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:newest,price_asc,price_desc,name_asc'],
         ]);
-        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size'])->where('is_active', true)
+        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])->where('is_active', true)
             ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%")))
             ->when($filters['min_price'] ?? null, fn ($query, $price) => $query->where('selling_price', '>=', $price))
             ->when($filters['max_price'] ?? null, fn ($query, $price) => $query->where('selling_price', '<=', $price))
             ->when($filters['categories'] ?? null, fn ($query, $ids) => $query->whereIn('category_id', $ids))
+            ->when($filters['subcategories'] ?? null, function ($query, $ids) {
+                $query->where(function ($nested) use ($ids) {
+                    foreach ($ids as $id) {
+                        $nested->orWhereJsonContains('subcategory_ids', $id);
+                    }
+                });
+            })
             ->when($filters['brands'] ?? null, fn ($query, $ids) => $query->whereIn('brand_id', $ids))
-            ->when($filters['colors'] ?? null, fn ($query, $ids) => $query->whereIn('color_id', $ids))
-            ->when($filters['sizes'] ?? null, fn ($query, $ids) => $query->whereIn('size_id', $ids))
+            ->when($filters['colors'] ?? null, fn ($query, $ids) => $query->where(fn ($nested) => $nested->whereIn('color_id', $ids)->orWhereHas('colors', fn ($colors) => $colors->whereIn('colors.id', $ids))))
+            ->when($filters['sizes'] ?? null, fn ($query, $ids) => $query->where(fn ($nested) => $nested->whereIn('size_id', $ids)->orWhereHas('sizes', fn ($sizes) => $sizes->whereIn('sizes.id', $ids))))
             ->when($request->boolean('in_stock'), fn ($query) => $query->where('stock_quantity', '>', 0));
 
         match ($filters['sort'] ?? 'newest') {
@@ -116,7 +134,7 @@ class PublicStorefrontController extends Controller
 
     public function product(string $slug): JsonResponse
     {
-        $product = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'unit'])
+        $product = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes', 'unit'])
             ->where('is_active', true)->where('slug', $slug)->firstOrFail();
         $mediaById = Media::whereIn('id', $product->gallery_media_ids ?? [])->get()->keyBy('id');
         $gallery = collect($product->gallery_media_ids ?? [])->map(fn ($id) => $mediaById->get($id))
@@ -126,8 +144,10 @@ class PublicStorefrontController extends Controller
             'product' => array_merge($this->productPayload($product), [
                 'description' => $product->description,
                 'brand' => $product->brand?->name,
-                'size' => $product->size?->name,
-                'color' => $product->color?->name,
+                'size' => $product->sizes->pluck('name')->first() ?? $product->size?->name,
+                'sizes' => $product->sizes->pluck('name')->whenEmpty(fn () => collect([$product->size?->name]))->filter()->values(),
+                'color' => $product->colors->pluck('name')->first() ?? $product->color?->name,
+                'colors' => $product->colors->map(fn ($color) => ['name' => $color->name, 'hex_code' => $color->hex_code])->whenEmpty(fn () => $product->color ? collect([['name' => $product->color->name, 'hex_code' => $product->color->hex_code]]) : collect())->values(),
                 'unit' => $product->unit?->name,
                 'gallery' => $gallery->map(fn (Media $media) => ['id' => $media->id, 'url' => $media->url]),
             ]),
@@ -145,7 +165,7 @@ class PublicStorefrontController extends Controller
             'id' => $product->id, 'name' => $product->name, 'slug' => $product->slug,
             'short_description' => $product->short_description, 'image_url' => $product->thumbnail?->url,
             'category' => $product->category?->name, 'brand' => $product->brand?->name,
-            'color' => $product->color?->name, 'size' => $product->size?->name, 'price' => round($salePrice, 2),
+            'color' => $product->colors->pluck('name')->first() ?? $product->color?->name, 'size' => $product->sizes->pluck('name')->first() ?? $product->size?->name, 'price' => round($salePrice, 2),
             'original_price' => $discount > 0 ? $originalPrice : null, 'discount' => $discount,
             'stock' => $product->stock_quantity,
         ];

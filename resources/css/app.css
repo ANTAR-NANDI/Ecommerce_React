@@ -1,6 +1,7 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import 'bootstrap-icons/font/bootstrap-icons.css';
 @import 'select2/dist/css/select2.css';
+@import './customer.css';
 
 :root {
     --brand: #7256e7;
