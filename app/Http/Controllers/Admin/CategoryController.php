@@ -12,7 +12,7 @@ use Illuminate\View\View;
 
 class CategoryController extends Controller
 {
-    public function index(): View { return view('admin.categories.index', ['categories' => Category::with(['icon', 'banner'])->orderBy('display_order')->paginate(12)]); }
+    public function index(): View { return view('admin.categories.index', ['categories' => Category::with(['icon', 'banner'])->orderBy('display_order')->paginate(12)->withQueryString()]); }
     public function create(): View { return view('admin.categories.create', ['media' => Media::latest()->get(), 'category' => new Category(['is_active' => true])]); }
     public function store(Request $request): RedirectResponse
     {

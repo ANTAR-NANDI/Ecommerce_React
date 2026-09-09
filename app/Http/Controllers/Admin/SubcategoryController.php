@@ -13,7 +13,7 @@ use Illuminate\View\View;
 
 class SubcategoryController extends Controller
 {
-    public function index(): View { return view('admin.subcategories.index', ['subcategories' => Subcategory::with(['categories', 'icon'])->latest()->paginate(12)]); }
+    public function index(): View { return view('admin.subcategories.index', ['subcategories' => Subcategory::with(['categories', 'icon'])->latest()->paginate(12)->withQueryString()]); }
     public function create(): View { return view('admin.subcategories.create', ['categories' => Category::where('is_active', true)->orderBy('name')->get(), 'media' => Media::latest()->get(), 'subcategory' => new Subcategory()]); }
     public function store(Request $request): RedirectResponse
     {
