@@ -26,9 +26,13 @@ use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\PublicStorefrontController;
 use App\Http\Controllers\PublicContactMessageController;
 use App\Http\Controllers\PublicCmsPageController;
+use App\Http\Controllers\PublicCheckoutController;
 use App\Http\Controllers\Admin\CmsPageController;
 use App\Http\Controllers\Admin\CmsMenuController;
 use App\Http\Controllers\Admin\CmsFooterController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -37,11 +41,14 @@ Route::get('/', function () {
 Route::get('api/storefront', [PublicStorefrontController::class, 'data'])->name('storefront.data');
 Route::get('api/products', [PublicStorefrontController::class, 'catalog'])->name('products.public.index');
 Route::get('api/products/{slug}', [PublicStorefrontController::class, 'product'])->name('products.public.show');
+Route::post('api/checkout/coupon', [PublicCheckoutController::class, 'coupon'])->name('checkout.coupon');
+Route::post('api/checkout', [PublicCheckoutController::class, 'store'])->name('checkout.store');
 Route::get('api/brands', [PublicStorefrontController::class, 'brands'])->name('brands.public.data');
 Route::view('products', 'storefront')->name('products.public.index.view');
 Route::view('products/{slug}', 'storefront')->name('products.public');
 Route::view('brands', 'storefront')->name('brands.public');
 Route::view('contact-us', 'storefront')->name('contact.show');
+Route::view('checkout', 'storefront')->name('checkout');
 Route::get('api/contact-settings', [PublicContactController::class,'data'])->name('contact.data');
 Route::post('api/contact-messages', [PublicContactMessageController::class,'store'])->name('contact.messages.store');
 Route::get('api/blogs', [PublicBlogController::class,'index'])->name('blogs.public.index');
@@ -53,9 +60,11 @@ Route::view('page/{slug}', 'storefront')->name('pages.public');
 
 Route::middleware('guest')->group(function () { Route::get('login', [LoginController::class,'create'])->name('login'); Route::post('login', [LoginController::class,'store'])->name('login.store'); });
 Route::post('logout', [LoginController::class,'destroy'])->middleware('auth')->name('logout');
-Route::view('/admin', 'admin.dashboard')->middleware(['auth','admin.access'])->name('admin.dashboard');
+Route::get('/admin', [DashboardController::class, 'index'])->middleware(['auth','admin.access'])->name('admin.dashboard');
 
 Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->group(function () {
+    Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::prefix('promotions/{type}')->name('promotions.')->whereIn('type', ['flash-deals', 'banners', 'ads-campaigns', 'promo-codes'])->group(function () {
         Route::get('/', [PromotionController::class, 'index'])->name('index');
         Route::get('create', [PromotionController::class, 'create'])->name('create');
@@ -76,6 +85,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::get('users', [UserController::class,'index'])->name('users.index');
     Route::get('users/create', [UserController::class,'create'])->name('users.create');
     Route::post('users', [UserController::class,'store'])->name('users.store');
+    Route::resource('roles', RoleController::class)->except('show')->middleware('superadmin');
     Route::get('orders', [EcommerceOrderController::class,'index'])->name('orders.index');
     Route::get('orders/{order}', [EcommerceOrderController::class,'show'])->name('orders.show');
     Route::put('orders/{order}/status', [EcommerceOrderController::class,'updateStatus'])->name('orders.status');

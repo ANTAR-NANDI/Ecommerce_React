@@ -85,7 +85,8 @@
                 <a href="{{ route('admin.media.index') }}" class="side-link {{ request()->routeIs('admin.media.*') ? 'active' : '' }}"><i class="bi bi-images"></i> Media library</a>
 
                 <p class="nav-label">Administration</p>
-                <a href="{{ route('admin.users.index') }}" class="side-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}"><i class="bi bi-shield-lock-fill"></i> Users & roles</a>
+                <a href="{{ route('admin.users.index') }}" class="side-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}"><i class="bi bi-people-fill"></i> Users</a>
+                <a href="{{ route('admin.roles.index') }}" class="side-link {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}"><i class="bi bi-shield-lock-fill"></i> Roles & Permissions</a>
             @endif
         </nav>
     </aside>
