@@ -13,14 +13,16 @@
             <div class="brand-mark"><i class="bi bi-bag-heart-fill"></i></div>
             <div class="brand-name">Velora<span>Commerce</span></div>
         </div>
-        <nav class="flex-grow-1 overflow-auto pb-4">
+        <nav class="sidebar-nav flex-grow-1 overflow-auto pb-4">
             <p class="nav-label">Workspace</p>
             <a href="{{ route('admin.dashboard') }}" class="side-link active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
-            <a href="#" class="side-link"><i class="bi bi-receipt"></i> Orders <span class="badge rounded-pill ms-auto" style="background:var(--brand-soft);color:var(--brand)">12</span></a>
-            <a href="#" class="side-link"><i class="bi bi-box-seam"></i> Products</a>
-            <button class="side-link border-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#dashboard-variant-menu" aria-expanded="false"><i class="bi bi-boxes"></i> Product Variant <i class="bi bi-chevron-down"></i></button>
+            <a href="{{ route('admin.orders.index') }}" class="side-link"><i class="bi bi-receipt"></i> Ecommerce Orders</a>
+            <a href="{{ route('admin.pos.index') }}" class="side-link"><i class="bi bi-shop-window"></i> POS</a>
+            <a href="{{ route('admin.products.index') }}" class="side-link"><i class="bi bi-box-seam"></i> Products</a>
+            @if(auth()->user()->isSuperAdmin())
+            <button class="side-link border-0 w-100 text-start" type="button" data-admin-collapse="#dashboard-variant-menu" aria-expanded="false"><i class="bi bi-boxes"></i> Product Variant <i class="bi bi-chevron-down"></i></button>
             <div id="dashboard-variant-menu" class="collapse"><div class="ms-4 border-start" style="border-color:var(--line)!important"><a href="{{ route('admin.brands.index') }}" class="side-link py-2">Brand</a><a href="{{ route('admin.colors.index') }}" class="side-link py-2">Color</a><a href="{{ route('admin.sizes.index') }}" class="side-link py-2">Size</a><a href="{{ route('admin.units.index') }}" class="side-link py-2">Unit</a></div></div>
-            <button class="side-link border-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#dashboard-category-menu" aria-expanded="false"><i class="bi bi-grid-3x3-gap-fill"></i> Category <i class="bi bi-chevron-down"></i></button>
+            <button class="side-link border-0 w-100 text-start" type="button" data-admin-collapse="#dashboard-category-menu" aria-expanded="false"><i class="bi bi-grid-3x3-gap-fill"></i> Category <i class="bi bi-chevron-down"></i></button>
             <div id="dashboard-category-menu" class="collapse">
             <div class="ms-4 border-start" style="border-color:var(--line)!important">
                 <a href="{{ route('admin.categories.index') }}" class="side-link py-2">All category</a>
@@ -29,14 +31,17 @@
                 <a href="{{ route('admin.subcategories.create') }}" class="side-link py-2">Add subcategory</a>
             </div>
             </div>
-            <a href="#" class="side-link"><i class="bi bi-people"></i> Customers</a>
+            <a href="{{ route('admin.customers.index') }}" class="side-link"><i class="bi bi-people"></i> Customers</a>
+            <a href="{{ route('admin.blogs.index') }}" class="side-link"><i class="bi bi-journal-richtext"></i> Blog</a>
             <p class="nav-label">Operations</p>
-            <a href="#" class="side-link"><i class="bi bi-truck"></i> Delivery</a>
-            <a href="#" class="side-link"><i class="bi bi-arrow-counterclockwise"></i> Returns</a>
-            <a href="#" class="side-link"><i class="bi bi-megaphone"></i> Promotions</a>
+            <a href="{{ route('admin.warehouses.index') }}" class="side-link"><i class="bi bi-buildings"></i> Warehouses</a>
+            <a href="{{ route('admin.purchases.index') }}" class="side-link"><i class="bi bi-cart-plus"></i> Purchases</a>
+            <a href="{{ route('admin.suppliers.index') }}" class="side-link"><i class="bi bi-truck"></i> Suppliers</a>
             <p class="nav-label">System</p>
-            <a href="#" class="side-link"><i class="bi bi-palette"></i> Store themes</a>
-            <a href="#" class="side-link"><i class="bi bi-gear"></i> Settings</a>
+            <a href="{{ route('admin.contact.edit') }}" class="side-link"><i class="bi bi-chat-dots"></i> Contact Us</a>
+            <a href="{{ route('admin.media.index') }}" class="side-link"><i class="bi bi-images"></i> Media library</a>
+            <a href="{{ route('admin.users.index') }}" class="side-link"><i class="bi bi-shield-lock"></i> Users & roles</a>
+            @endif
         </nav>
         <div class="m-3 p-3 rounded-3" style="background:var(--brand-soft)">
             <div class="small fw-bold mb-1">Need assistance?</div>

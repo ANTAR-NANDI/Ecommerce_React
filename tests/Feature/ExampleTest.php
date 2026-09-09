@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Subcategory;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     use RefreshDatabase;
+    protected function setUp(): void { parent::setUp(); $this->actingAs(User::factory()->create(['role'=>'superadmin'])); }
     /**
      * A basic test example.
      */
@@ -25,6 +27,11 @@ class ExampleTest extends TestCase
         $response = $this->get(route('admin.dashboard'));
 
         $response->assertOk();
+    }
+
+    public function test_the_pos_screen_renders_without_a_template_error(): void
+    {
+        $this->get(route('admin.pos.index'))->assertOk()->assertSee('Point of Sale');
     }
 
     public function test_a_category_can_be_created(): void

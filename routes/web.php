@@ -11,16 +11,59 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\PosController;
+use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\PosOrderController;
+use App\Http\Controllers\Admin\EcommerceOrderController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Admin\ContactSettingController;
+use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\BlogController;
+use App\Http\Controllers\Admin\PromotionController;
+use App\Http\Controllers\PublicBlogController;
+use App\Http\Controllers\PublicContactController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('admin.dashboard');
 });
+Route::get('contact-us', [PublicContactController::class,'show'])->name('contact.show');
+Route::get('api/contact-settings', [PublicContactController::class,'data'])->name('contact.data');
+Route::get('api/blogs', [PublicBlogController::class,'index'])->name('blogs.public.index');
+Route::get('api/blogs/{slug}', [PublicBlogController::class,'show'])->name('blogs.public.show');
 
-Route::view('/admin', 'admin.dashboard')->name('admin.dashboard');
+Route::middleware('guest')->group(function () { Route::get('login', [LoginController::class,'create'])->name('login'); Route::post('login', [LoginController::class,'store'])->name('login.store'); });
+Route::post('logout', [LoginController::class,'destroy'])->middleware('auth')->name('logout');
+Route::view('/admin', 'admin.dashboard')->middleware(['auth','admin.access'])->name('admin.dashboard');
 
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->group(function () {
+    Route::prefix('promotions/{type}')->name('promotions.')->whereIn('type', ['flash-deals', 'banners', 'ads-campaigns', 'promo-codes'])->group(function () {
+        Route::get('/', [PromotionController::class, 'index'])->name('index');
+        Route::get('create', [PromotionController::class, 'create'])->name('create');
+        Route::post('/', [PromotionController::class, 'store'])->name('store');
+        Route::get('{promotion}/edit', [PromotionController::class, 'edit'])->name('edit');
+        Route::put('{promotion}', [PromotionController::class, 'update'])->name('update');
+        Route::delete('{promotion}', [PromotionController::class, 'destroy'])->name('destroy');
+    });
+    Route::resource('blogs', BlogController::class)->except('show');
+    Route::resource('customers', CustomerController::class)->except('show');
+    Route::get('contact', [ContactSettingController::class,'edit'])->name('contact.edit');
+    Route::put('contact', [ContactSettingController::class,'update'])->name('contact.update');
+    Route::get('users', [UserController::class,'index'])->name('users.index');
+    Route::get('users/create', [UserController::class,'create'])->name('users.create');
+    Route::post('users', [UserController::class,'store'])->name('users.store');
+    Route::get('orders', [EcommerceOrderController::class,'index'])->name('orders.index');
+    Route::get('orders/{order}', [EcommerceOrderController::class,'show'])->name('orders.show');
+    Route::put('orders/{order}/status', [EcommerceOrderController::class,'updateStatus'])->name('orders.status');
+    Route::get('orders/{order}/invoice', [EcommerceOrderController::class,'invoice'])->name('orders.invoice');
+    Route::resource('suppliers', SupplierController::class)->except('show');
     Route::get('pos', [PosController::class,'index'])->name('pos.index');
+    Route::post('pos/orders', [PosOrderController::class,'save'])->name('pos.orders.save');
+    Route::get('pos/history', [PosOrderController::class,'history'])->name('pos.history');
+    Route::get('pos/drafts', [PosOrderController::class,'drafts'])->name('pos.drafts');
+    Route::get('pos/drafts/{order}/continue', [PosOrderController::class,'continue'])->name('pos.drafts.continue');
+    Route::put('pos/drafts/{order}', [PosOrderController::class,'update'])->name('pos.drafts.update');
+    Route::get('pos/orders/{order}/invoice', [PosOrderController::class,'invoice'])->name('pos.invoice');
     Route::get('purchases', [PurchaseController::class,'index'])->name('purchases.index');
     Route::get('purchases/create', [PurchaseController::class,'create'])->name('purchases.create');
     Route::post('purchases', [PurchaseController::class,'store'])->name('purchases.store');
