@@ -69,6 +69,13 @@
 
                 <a href="{{ route('admin.customers.index') }}" class="side-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"><i class="bi bi-people-fill"></i> Customers</a>
                 <a href="{{ route('admin.blogs.index') }}" class="side-link {{ request()->routeIs('admin.blogs.*') ? 'active' : '' }}"><i class="bi bi-journal-richtext"></i> Blog</a>
+                @php($cmsOpen = request()->routeIs('admin.cms.*'))
+                <button type="button" class="side-link border-0 w-100 text-start {{ $cmsOpen ? 'active' : '' }}" data-admin-collapse="#cms-menu" aria-expanded="{{ $cmsOpen ? 'true' : 'false' }}"><i class="bi bi-window-stack"></i> CMS <i class="bi bi-chevron-down"></i></button>
+                <div id="cms-menu" class="collapse {{ $cmsOpen ? 'show' : '' }}"><div class="ms-4 border-start">
+                    <a href="{{ route('admin.cms.pages.index') }}" class="side-link py-2">Pages</a>
+                    <a href="{{ route('admin.cms.menus.index') }}" class="side-link py-2">Menus</a>
+                    <a href="{{ route('admin.cms.footer.edit') }}" class="side-link py-2">Footer</a>
+                </div></div>
                 <a href="{{ route('admin.contact.edit') }}" class="side-link {{ request()->routeIs('admin.contact.*') ? 'active' : '' }}"><i class="bi bi-chat-dots-fill"></i> Contact Us</a>
 
                 <p class="nav-label">ERP</p>

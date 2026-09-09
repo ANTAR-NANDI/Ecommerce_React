@@ -11,5 +11,10 @@ class Product extends Model
     protected $fillable = ['name','slug','short_description','description','category_id','subcategory_ids','brand_id','color_id','unit_id','size_id','sku','weight','buying_price','selling_price','discount_type','discount','stock_quantity','thumbnail_media_id','gallery_media_ids','video_url','meta_title','meta_description','meta_keywords','is_active'];
     protected function casts(): array { return ['subcategory_ids'=>'array','gallery_media_ids'=>'array','is_active'=>'boolean']; }
     public function thumbnail(): BelongsTo { return $this->belongsTo(Media::class, 'thumbnail_media_id'); }
+    public function category(): BelongsTo { return $this->belongsTo(Category::class); }
+    public function brand(): BelongsTo { return $this->belongsTo(Brand::class); }
+    public function color(): BelongsTo { return $this->belongsTo(Color::class); }
+    public function size(): BelongsTo { return $this->belongsTo(Size::class); }
+    public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
     public function warehouseStocks(): HasMany { return $this->hasMany(WarehouseProductStock::class); }
 }

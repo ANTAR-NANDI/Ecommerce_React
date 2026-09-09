@@ -66,7 +66,7 @@
         <div class="page-content">
             <section class="welcome-card d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                 <div><p class="text-uppercase small fw-bold mb-1" style="color:var(--brand);letter-spacing:.08em">Store overview</p><h1 class="mb-1">Your store is growing beautifully.</h1><p class="mb-0 small" style="color:var(--muted)">Sales are up 18.6% compared with last month.</p></div>
-                <button class="btn px-3 py-2 text-white" style="background:var(--brand);border-radius:10px"><i class="bi bi-plus-lg me-1"></i> Add product</button>
+                <a href="{{ route('admin.products.create') }}" class="btn px-3 py-2 text-white" style="background:var(--brand);border-radius:10px"><i class="bi bi-plus-lg me-1"></i> Add product</a>
             </section>
             <section class="row g-3 mb-4">
                 <div class="col-sm-6 col-xl-3"><div class="stat-card" style="--accent:#7256e7;--tint:#f0edff"><div class="stat-icon"><i class="bi bi-shop"></i></div><div class="stat-number">24</div><div class="stat-name">Active shops <span class="text-success ms-1">+2</span></div></div></div>

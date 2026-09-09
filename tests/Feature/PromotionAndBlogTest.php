@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Blog;
+use App\Models\ContactMessage;
 use App\Models\Promotion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +24,60 @@ class PromotionAndBlogTest extends TestCase
         foreach (['flash-deals', 'banners', 'ads-campaigns', 'promo-codes'] as $type) {
             $this->get(route('admin.promotions.index', $type))->assertOk();
         }
+    }
+
+    public function test_storefront_data_endpoint_is_publicly_available(): void
+    {
+        auth()->logout();
+
+        $this->get(route('storefront.data'))
+            ->assertOk()
+            ->assertJsonStructure(['categories', 'products', 'flash_products', 'banners', 'blogs', 'contact']);
+    }
+
+    public function test_public_catalog_endpoint_provides_filters_and_paginated_products(): void
+    {
+        auth()->logout();
+
+        $this->get(route('products.public.index'))
+            ->assertOk()
+            ->assertJsonStructure([
+                'products' => ['data', 'current_page', 'last_page', 'total'],
+                'filters' => ['categories', 'brands', 'colors', 'sizes'],
+            ]);
+    }
+
+    public function test_public_brand_directory_data_is_available(): void
+    {
+        auth()->logout();
+
+        $this->get(route('brands.public.data'))
+            ->assertOk()
+            ->assertJsonStructure(['*' => ['id', 'name', 'icon_url', 'products_count']]);
+    }
+
+    public function test_a_guest_can_send_a_contact_message(): void
+    {
+        auth()->logout();
+
+        $this->postJson(route('contact.messages.store'), [
+            'name' => 'Amina Rahman',
+            'phone' => '+8801700000000',
+            'email' => 'amina@example.com',
+            'subject' => 'Delivery question',
+            'message' => 'Could you please help with delivery timing?',
+        ])->assertCreated()->assertJsonPath('message', 'Thank you. Your message has been sent successfully.');
+
+        $this->assertDatabaseHas('contact_messages', ['name' => 'Amina Rahman', 'subject' => 'Delivery question']);
+    }
+
+    public function test_public_blog_listing_returns_posts_and_categories(): void
+    {
+        auth()->logout();
+
+        $this->get(route('blogs.public.index'))
+            ->assertOk()
+            ->assertJsonStructure(['posts' => ['data', 'current_page', 'last_page'], 'categories']);
     }
 
     public function test_a_promo_code_can_be_created(): void

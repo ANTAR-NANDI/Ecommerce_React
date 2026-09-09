@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
@@ -13,4 +14,5 @@ class Category extends Model
     public function icon(): BelongsTo { return $this->belongsTo(Media::class, 'icon_media_id'); }
     public function banner(): BelongsTo { return $this->belongsTo(Media::class, 'banner_media_id'); }
     public function subcategories(): BelongsToMany { return $this->belongsToMany(Subcategory::class)->withTimestamps(); }
+    public function blogs(): HasMany { return $this->hasMany(Blog::class); }
 }

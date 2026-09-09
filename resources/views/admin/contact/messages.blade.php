@@ -1,0 +1,6 @@
+@extends('layouts.admin')
+@section('title','Contact Messages')
+@section('content')
+<div class="d-flex justify-content-between align-items-center mb-4"><div class="content-heading"><h1>Contact Messages</h1><p>Messages sent from the live storefront contact form.</p></div><a href="{{ route('admin.contact.edit') }}" class="btn btn-outline-secondary">Contact settings</a></div>
+<div class="panel p-0 overflow-hidden"><div class="table-responsive"><table class="table mb-0 align-middle"><thead><tr><th>Sender</th><th>Subject & message</th><th>Phone</th><th>Received</th></tr></thead><tbody>@forelse($messages as $message)<tr><td><strong>{{ $message->name }}</strong>@if($message->email)<small class="d-block text-muted">{{ $message->email }}</small>@endif</td><td><strong>{{ $message->subject }}</strong><div class="text-muted mt-1">{{ \Illuminate\Support\Str::limit($message->message,120) }}</div></td><td>{{ $message->phone }}</td><td>{{ $message->created_at->format('d M Y, h:i A') }}</td></tr>@empty<tr><td colspan="4"><div class="text-center text-muted py-5">No customer messages yet.</div></td></tr>@endforelse</tbody></table></div>@if($messages->hasPages())<div class="p-3 border-top">{{ $messages->links() }}</div>@endif</div>
+@endsection

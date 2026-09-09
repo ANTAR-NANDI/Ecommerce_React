@@ -15,11 +15,11 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_the_homepage_redirects_to_the_admin_dashboard(): void
+    public function test_the_homepage_renders_the_react_storefront(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect(route('admin.dashboard'));
+        $response->assertOk()->assertSee('storefront-root');
     }
 
     public function test_the_admin_dashboard_is_available(): void
