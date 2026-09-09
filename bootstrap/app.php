@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['admin.access' => \App\Http\Middleware\EnsureAdminAccess::class, 'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class]);
+        $middleware->redirectGuestsTo(function (Request $request): string {
+            return $request->is('account*') || $request->is('api/customer/*')
+                ? route('customer.login')
+                : route('login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Shop the newest products and everyday deals.">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>VeloraCommerce · Shop with confidence</title>
+    <title>EBay · Shop with confidence</title>
     @viteReactRefresh
     @vite(['resources/css/storefront.css', 'resources/js/storefront.jsx'])
 </head>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Velora Admin</title>
+    <title>EBay Admin</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -11,7 +11,7 @@
     <aside class="sidebar d-flex flex-column" aria-label="Admin navigation">
         <div class="d-flex align-items-center gap-2 px-4 py-4">
             <div class="brand-mark"><i class="bi bi-bag-heart-fill"></i></div>
-            <div class="brand-name">Velora<span>Commerce</span></div>
+            <div class="brand-name">EBay</div>
         </div>
         <nav class="sidebar-nav flex-grow-1 overflow-auto pb-4">
             <p class="nav-label">Workspace</p>

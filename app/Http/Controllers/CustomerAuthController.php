@@ -25,7 +25,7 @@ class CustomerAuthController extends Controller
         $customer = Customer::create($data + ['is_active' => true]);
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
-        return to_route('customer.dashboard')->with('success', 'Welcome to VeloraCommerce — your account is ready.');
+        return to_route('customer.dashboard')->with('success', 'Welcome to EBay — your account is ready.');
     }
 
     public function store(Request $request): RedirectResponse
