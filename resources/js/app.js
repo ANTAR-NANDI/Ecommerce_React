@@ -149,15 +149,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const tax = parseFloat(document.querySelector('[name="tax"]')?.value) || 0;
         document.querySelector('#purchase-grand-total')?.replaceChildren(`$${(subtotal - discount + tax).toFixed(2)}`);
     };
+    const toggleCustomItemName = (row) => {
+        const productSelected = Boolean(row.querySelector('.product-select')?.value);
+        const name = row.querySelector('.product-name');
+        name.hidden = productSelected;
+        name.disabled = productSelected;
+        name.required = !productSelected;
+        if (productSelected) name.value = '';
+    };
     const namePurchaseFields = () => purchaseLines?.querySelectorAll('tr').forEach((row, index) => {
         row.querySelector('.product-select').name = `items[${index}][product_id]`;
         row.querySelector('.product-name').name = `items[${index}][product_name]`;
         row.querySelector('.line-qty').name = `items[${index}][quantity]`;
         row.querySelector('.line-cost').name = `items[${index}][unit_cost]`;
+        toggleCustomItemName(row);
     });
     document.querySelector('#add-purchase-line')?.addEventListener('click', () => { purchaseLines.append(document.querySelector('#purchase-line-template').content.cloneNode(true)); namePurchaseFields(); refreshPurchaseTotals(); });
     purchaseLines?.addEventListener('input', refreshPurchaseTotals);
-    purchaseLines?.addEventListener('change', (event) => { if (event.target.matches('.product-select')) { const option = event.target.selectedOptions[0]; const name = event.target.closest('td').querySelector('.product-name'); if (option?.dataset.name) name.value = option.dataset.name; } refreshPurchaseTotals(); });
+    purchaseLines?.addEventListener('change', (event) => { if (event.target.matches('.product-select')) toggleCustomItemName(event.target.closest('tr')); refreshPurchaseTotals(); });
     purchaseLines?.addEventListener('click', (event) => { if (event.target.closest('.remove-line') && purchaseLines.rows.length > 1) { event.target.closest('tr').remove(); namePurchaseFields(); refreshPurchaseTotals(); } });
     namePurchaseFields();
     refreshPurchaseTotals();

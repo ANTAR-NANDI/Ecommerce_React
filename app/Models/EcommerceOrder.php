@@ -11,7 +11,7 @@ class EcommerceOrder extends Model
     public const STATUSES = ['pending', 'accepted', 'processing', 'shipped', 'delivered', 'cancelled'];
     protected $fillable = ['order_number','customer_id','customer_name','customer_phone','customer_email','shipping_address','warehouse_id','payment_method','payment_status','status','subtotal','shipping_charge','discount','total','customer_note'];
     protected function casts(): array { return ['subtotal'=>'decimal:2','shipping_charge'=>'decimal:2','discount'=>'decimal:2','total'=>'decimal:2']; }
-    protected static function booted(): void { static::created(fn (self $order) => $order->statusHistory()->create(['status'=>$order->status])); }
+    protected static function booted(): void { static::created(fn (self $order) => $order->statusHistory()->create(['status' => $order->status ?: 'pending'])); }
     public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function items(): HasMany { return $this->hasMany(EcommerceOrderItem::class); }

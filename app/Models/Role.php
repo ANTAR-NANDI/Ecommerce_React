@@ -10,6 +10,7 @@ class Role extends Model
         'dashboard' => 'Dashboard', 'orders' => 'Ecommerce Orders', 'pos' => 'POS & POS Sales History',
         'products' => 'Products & Warehouse Stock', 'categories' => 'Categories', 'variants' => 'Product Variants',
         'purchases' => 'Purchases', 'warehouses' => 'Warehouses', 'suppliers' => 'Suppliers', 'customers' => 'Customers',
+        'accounts' => 'Chart of Accounts & Vouchers', 'reports' => 'Business Reports',
         'promotions' => 'Promotions', 'blogs' => 'Blog', 'cms' => 'CMS Pages, Menus & Footer', 'contact' => 'Contact Messages',
         'media' => 'Media Library', 'users' => 'Users & Roles',
     ];

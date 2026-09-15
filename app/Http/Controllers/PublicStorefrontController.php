@@ -74,7 +74,7 @@ class PublicStorefrontController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:150'],
             'min_price' => ['nullable', 'numeric', 'min:0'],
-            'max_price' => ['nullable', 'numeric', 'gte:min_price'],
+            'max_price' => array_values(array_filter(['nullable', 'numeric', 'min:0', $request->filled('min_price') ? 'gte:min_price' : null])),
             'categories' => ['nullable', 'array'], 'categories.*' => ['integer'],
             'subcategories' => ['nullable', 'array'], 'subcategories.*' => ['integer'],
             'brands' => ['nullable', 'array'], 'brands.*' => ['integer'],

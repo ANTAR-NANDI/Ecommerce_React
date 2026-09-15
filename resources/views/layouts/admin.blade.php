@@ -82,6 +82,20 @@
                 <a href="{{ route('admin.warehouses.index') }}" class="side-link {{ request()->routeIs('admin.warehouses.*') ? 'active' : '' }}"><i class="bi bi-buildings"></i> Warehouses</a>
                 <a href="{{ route('admin.purchases.index') }}" class="side-link {{ request()->routeIs('admin.purchases.*') ? 'active' : '' }}"><i class="bi bi-cart-plus"></i> Purchases</a>
                 <a href="{{ route('admin.suppliers.index') }}" class="side-link {{ request()->routeIs('admin.suppliers.*') ? 'active' : '' }}"><i class="bi bi-truck"></i> Suppliers</a>
+                @php($accountsOpen = request()->routeIs('admin.accounts.*') || request()->routeIs('admin.reports.*'))
+                <button type="button" class="side-link border-0 w-100 text-start {{ $accountsOpen ? 'active' : '' }}" data-admin-collapse="#accounts-menu" aria-expanded="{{ $accountsOpen ? 'true' : 'false' }}"><i class="bi bi-cash-stack"></i> Accounts <i class="bi bi-chevron-down"></i></button>
+                <div id="accounts-menu" class="collapse {{ $accountsOpen ? 'show' : '' }}"><div class="ms-4 border-start">
+                    <a href="{{ route('admin.accounts.coa') }}" class="side-link py-2">Chart of Account</a>
+                    <a href="{{ route('admin.accounts.vouchers') }}" class="side-link py-2">Accounting Vouchers</a>
+                    @php($reportsOpen = request()->routeIs('admin.accounts.reports') || request()->routeIs('admin.reports.*'))
+                    <button type="button" class="side-link border-0 w-100 text-start py-2 {{ $reportsOpen ? 'active' : '' }}" data-admin-collapse="#accounts-reports-menu" aria-expanded="{{ $reportsOpen ? 'true' : 'false' }}"><i class="bi bi-bar-chart-line"></i> Reports <i class="bi bi-chevron-down"></i></button>
+                    <div id="accounts-reports-menu" class="collapse {{ $reportsOpen ? 'show' : '' }}"><div class="ms-3 border-start">
+                        <div class="px-3 pt-2 pb-1 small text-uppercase text-muted fw-semibold">Financial reports</div>
+                        @foreach(\App\Http\Controllers\Admin\AccountReportController::FINANCIAL_REPORTS as $key => $label)<a href="{{ route('admin.accounts.reports',$key) }}" class="side-link py-2 {{ request()->route('report')===$key?'active':'' }}">{{ $label }}</a>@endforeach
+                        <div class="px-3 pt-3 pb-1 small text-uppercase text-muted fw-semibold">Business reports</div>
+                        @foreach(\App\Http\Controllers\Admin\AccountReportController::OPERATIONAL_REPORTS as $key => $label)<a href="{{ route('admin.accounts.reports',$key) }}" class="side-link py-2 {{ request()->route('report')===$key?'active':'' }}">{{ $label }}</a>@endforeach
+                    </div></div>
+                </div></div>
                 <a href="{{ route('admin.media.index') }}" class="side-link {{ request()->routeIs('admin.media.*') ? 'active' : '' }}"><i class="bi bi-images"></i> Media library</a>
 
                 <p class="nav-label">Administration</p>

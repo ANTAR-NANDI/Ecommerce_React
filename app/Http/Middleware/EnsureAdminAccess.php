@@ -12,6 +12,7 @@ class EnsureAdminAccess
         'admin.dashboard' => 'dashboard', 'admin.orders.' => 'orders', 'admin.pos.' => 'pos', 'admin.products.' => 'products',
         'admin.categories.' => 'categories', 'admin.subcategories.' => 'categories', 'admin.brands.' => 'variants', 'admin.colors.' => 'variants', 'admin.sizes.' => 'variants', 'admin.units.' => 'variants',
         'admin.purchases.' => 'purchases', 'admin.warehouses.' => 'warehouses', 'admin.suppliers.' => 'suppliers', 'admin.customers.' => 'customers',
+        'admin.accounts.' => 'accounts', 'admin.reports.' => 'reports',
         'admin.promotions.' => 'promotions', 'admin.blogs.' => 'blogs', 'admin.cms.' => 'cms', 'admin.contact.' => 'contact', 'admin.media.' => 'media',
         'admin.users.' => 'users', 'admin.roles.' => 'users', 'admin.profile.' => 'dashboard',
     ];

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\AccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,7 @@ class CustomerAuthController extends Controller
             'password' => ['required', 'min:8', 'confirmed'],
         ]);
         $customer = Customer::create($data + ['is_active' => true]);
+        app(AccountService::class)->ensureCustomerHead($customer);
         Auth::guard('customer')->login($customer);
         $request->session()->regenerate();
         return to_route('customer.dashboard')->with('success', 'Welcome to EBay — your account is ready.');
