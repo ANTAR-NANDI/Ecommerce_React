@@ -37,6 +37,8 @@
             <a href="{{ route('admin.warehouses.index') }}" class="side-link"><i class="bi bi-buildings"></i> Warehouses</a>
             <a href="{{ route('admin.purchases.index') }}" class="side-link"><i class="bi bi-cart-plus"></i> Purchases</a>
             <a href="{{ route('admin.suppliers.index') }}" class="side-link"><i class="bi bi-truck"></i> Suppliers</a>
+            <button class="side-link border-0 w-100 text-start" type="button" data-admin-collapse="#dashboard-accounts-menu" aria-expanded="false"><i class="bi bi-cash-stack"></i> Accounts <i class="bi bi-chevron-down"></i></button>
+            <div id="dashboard-accounts-menu" class="collapse"><div class="ms-4 border-start" style="border-color:var(--line)!important"><a href="{{ route('admin.accounts.coa') }}" class="side-link py-2">Chart of Account</a><a href="{{ route('admin.accounts.sub-accounts') }}" class="side-link py-2">Sub Account List</a><a href="{{ route('admin.accounts.predefined-accounts') }}" class="side-link py-2">Predefined Accounts</a><a href="{{ route('admin.accounts.financial-years') }}" class="side-link py-2">Financial Year</a><a href="{{ route('admin.accounts.opening-balances') }}" class="side-link py-2">Opening Balance</a><a href="{{ route('admin.accounts.vouchers',['type'=>'debit']) }}" class="side-link py-2">Debit Voucher</a><a href="{{ route('admin.accounts.vouchers',['type'=>'credit']) }}" class="side-link py-2">Credit Voucher</a><a href="{{ route('admin.accounts.vouchers',['type'=>'contra']) }}" class="side-link py-2">Contra Voucher</a><a href="{{ route('admin.accounts.vouchers',['type'=>'journal']) }}" class="side-link py-2">Journal Voucher</a></div></div>
             <p class="nav-label">System</p>
             <a href="{{ route('admin.contact.edit') }}" class="side-link"><i class="bi bi-chat-dots"></i> Contact Us</a>
             <a href="{{ route('admin.media.index') }}" class="side-link"><i class="bi bi-images"></i> Media library</a>
@@ -48,6 +50,7 @@
             <div class="small" style="color:var(--muted)">Visit the help center</div>
         </div>
     </aside>
+    <button class="sidebar-backdrop" type="button" aria-label="Close navigation" data-sidebar-close></button>
     <main class="flex-grow-1 min-vw-0">
         <header class="topbar px-3 px-lg-4 d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-3">

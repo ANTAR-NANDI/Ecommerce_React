@@ -6,9 +6,12 @@ use App\Models\EcommerceOrder;
 use App\Models\Product;
 use App\Models\Promotion;
 use App\Models\Warehouse;
+use App\Mail\OrderConfirmationMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class PublicCheckoutController extends Controller
 {
@@ -30,6 +33,7 @@ class PublicCheckoutController extends Controller
         $subtotal = (float) $items->sum('line_total'); $promotion = $data['coupon_code'] ? $this->couponFor($data['coupon_code']) : null;
         $discount = $promotion && (! $promotion->minimum_order_amount || $subtotal >= $promotion->minimum_order_amount) && (! $promotion->usage_limit || $promotion->used_count < $promotion->usage_limit) ? ($promotion->discount_type === 'percent' ? $subtotal * ((float) $promotion->discount_value / 100) : min($subtotal, (float) $promotion->discount_value)) : 0;
         $order = DB::transaction(function () use ($data, $items, $subtotal, $discount, $promotion) { $customer = auth('customer')->user(); $order = EcommerceOrder::create(['order_number' => 'EC-'.now()->format('ymdHis').'-'.random_int(100, 999), 'customer_id' => $customer?->id, 'customer_name' => $data['name'], 'customer_phone' => $data['phone'], 'customer_email' => $data['email'], 'shipping_address' => trim(($data['address_tag'] ? ucfirst($data['address_tag']).': ' : '').$data['address'].($data['area'] ? ', '.$data['area'] : '')), 'warehouse_id' => Warehouse::where('is_active', true)->value('id'), 'payment_method' => $data['payment_method'] === 'card' ? 'Credit / Debit Card' : 'Cash on delivery', 'payment_status' => 'pending', 'status' => 'pending', 'shipping_charge' => 0, 'subtotal' => $subtotal, 'discount' => round($discount, 2), 'total' => round($subtotal - $discount, 2), 'customer_note' => $data['note']]); $order->items()->createMany($items->all()); if ($promotion) $promotion->increment('used_count'); return $order; });
+        if ($order->customer_email) { try { Mail::to($order->customer_email)->send(new OrderConfirmationMail($order->load('items'))); } catch (\Throwable $exception) { Log::warning('Order confirmation email could not be sent.', ['order' => $order->order_number, 'exception' => $exception->getMessage()]); } }
         return response()->json(['message' => 'Your order has been placed.', 'order_number' => $order->order_number]);
     }
     private function couponFor(string $code): ?Promotion { return Promotion::where('type', 'promo_code')->where('code', mb_strtoupper(trim($code)))->where('is_active', true)->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))->first(); }

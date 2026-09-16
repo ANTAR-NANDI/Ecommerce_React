@@ -86,7 +86,18 @@
                 <button type="button" class="side-link border-0 w-100 text-start {{ $accountsOpen ? 'active' : '' }}" data-admin-collapse="#accounts-menu" aria-expanded="{{ $accountsOpen ? 'true' : 'false' }}"><i class="bi bi-cash-stack"></i> Accounts <i class="bi bi-chevron-down"></i></button>
                 <div id="accounts-menu" class="collapse {{ $accountsOpen ? 'show' : '' }}"><div class="ms-4 border-start">
                     <a href="{{ route('admin.accounts.coa') }}" class="side-link py-2">Chart of Account</a>
-                    <a href="{{ route('admin.accounts.vouchers') }}" class="side-link py-2">Accounting Vouchers</a>
+                    <a href="{{ route('admin.accounts.sub-accounts') }}" class="side-link py-2 {{ request()->routeIs('admin.accounts.sub-accounts') ? 'active' : '' }}">Sub Account List</a>
+                    <a href="{{ route('admin.accounts.predefined-accounts') }}" class="side-link py-2 {{ request()->routeIs('admin.accounts.predefined-accounts') ? 'active' : '' }}">Predefined Accounts</a>
+                    <a href="{{ route('admin.accounts.financial-years') }}" class="side-link py-2 {{ request()->routeIs('admin.accounts.financial-years') ? 'active' : '' }}">Financial Year</a>
+                    <a href="{{ route('admin.accounts.opening-balances') }}" class="side-link py-2 {{ request()->routeIs('admin.accounts.opening-balances') ? 'active' : '' }}">Opening Balance</a>
+                    <a href="{{ route('admin.accounts.payment-methods') }}" class="side-link py-2 {{ request()->routeIs('admin.accounts.payment-methods') ? 'active' : '' }}">Payment Methods</a>
+                    <a href="{{ route('admin.accounts.settlement','supplier-payment') }}" class="side-link py-2">Supplier Payment</a>
+                    <a href="{{ route('admin.accounts.settlement','customer-receive') }}" class="side-link py-2">Customer Receive</a>
+                    <a href="{{ route('admin.accounts.cash-adjustment') }}" class="side-link py-2">Cash Adjustment</a>
+                    <a href="{{ route('admin.accounts.vouchers', ['type' => 'debit']) }}" class="side-link py-2 {{ request('type') === 'debit' ? 'active' : '' }}">Debit Voucher</a>
+                    <a href="{{ route('admin.accounts.vouchers', ['type' => 'credit']) }}" class="side-link py-2 {{ request('type') === 'credit' ? 'active' : '' }}">Credit Voucher</a>
+                    <a href="{{ route('admin.accounts.vouchers', ['type' => 'contra']) }}" class="side-link py-2 {{ request('type') === 'contra' ? 'active' : '' }}">Contra Voucher</a>
+                    <a href="{{ route('admin.accounts.vouchers', ['type' => 'journal']) }}" class="side-link py-2 {{ request('type') === 'journal' ? 'active' : '' }}">Journal Voucher</a>
                     @php($reportsOpen = request()->routeIs('admin.accounts.reports') || request()->routeIs('admin.reports.*'))
                     <button type="button" class="side-link border-0 w-100 text-start py-2 {{ $reportsOpen ? 'active' : '' }}" data-admin-collapse="#accounts-reports-menu" aria-expanded="{{ $reportsOpen ? 'true' : 'false' }}"><i class="bi bi-bar-chart-line"></i> Reports <i class="bi bi-chevron-down"></i></button>
                     <div id="accounts-reports-menu" class="collapse {{ $reportsOpen ? 'show' : '' }}"><div class="ms-3 border-start">

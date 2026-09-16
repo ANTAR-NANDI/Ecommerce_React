@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\PromotionController;
 use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\PublicContactController;
 use App\Http\Controllers\PublicStorefrontController;
+use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicContactMessageController;
 use App\Http\Controllers\PublicCmsPageController;
 use App\Http\Controllers\PublicCheckoutController;
@@ -69,6 +70,7 @@ Route::middleware('guest:customer')->group(function () {
     Route::post('customer/signup', [CustomerAuthController::class, 'storeRegistration'])->name('customer.signup.store');
 });
 Route::middleware('auth:customer')->group(function () {
+    Route::post('api/products/{product}/reviews', [ProductReviewController::class, 'store'])->name('products.reviews.store');
     Route::post('customer/logout', [CustomerAuthController::class, 'destroy'])->name('customer.logout');
     Route::get('account', [CustomerAccountController::class, 'dashboard'])->name('customer.dashboard');
     Route::get('account/orders', [CustomerAccountController::class, 'orders'])->name('customer.orders');
@@ -121,6 +123,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::get('orders/{order}/invoice', [EcommerceOrderController::class,'invoice'])->name('orders.invoice');
     Route::resource('suppliers', SupplierController::class)->except('show');
     Route::get('accounts/coa', [AccountController::class, 'coa'])->name('accounts.coa');
+    Route::get('accounts/sub-accounts', [AccountController::class, 'subAccounts'])->name('accounts.sub-accounts');
+    Route::get('accounts/predefined-accounts', [AccountController::class, 'predefinedAccounts'])->name('accounts.predefined-accounts');
+    Route::put('accounts/predefined-accounts', [AccountController::class, 'updatePredefinedAccounts'])->name('accounts.predefined-accounts.update');
+    Route::get('accounts/financial-years', [AccountController::class, 'financialYears'])->name('accounts.financial-years');
+    Route::post('accounts/financial-years', [AccountController::class, 'storeFinancialYear'])->name('accounts.financial-years.store');
+    Route::put('accounts/financial-years/{financialYear}/close', [AccountController::class, 'closeFinancialYear'])->name('accounts.financial-years.close');
+    Route::get('accounts/opening-balances', [AccountController::class, 'openingBalances'])->name('accounts.opening-balances');
+    Route::post('accounts/opening-balances', [AccountController::class, 'storeOpeningBalance'])->name('accounts.opening-balances.store');
+    Route::get('accounts/payment-methods', [AccountController::class, 'paymentMethods'])->name('accounts.payment-methods');
+    Route::post('accounts/payment-methods', [AccountController::class, 'storePaymentMethod'])->name('accounts.payment-methods.store');
+    Route::get('accounts/{type}', [AccountController::class, 'settlement'])->whereIn('type',['supplier-payment','customer-receive'])->name('accounts.settlement');
+    Route::post('accounts/{type}', [AccountController::class, 'storeSettlement'])->whereIn('type',['supplier-payment','customer-receive'])->name('accounts.settlement.store');
+    Route::get('accounts/cash-adjustment', [AccountController::class, 'cashAdjustment'])->name('accounts.cash-adjustment');
+    Route::post('accounts/cash-adjustment', [AccountController::class, 'storeCashAdjustment'])->name('accounts.cash-adjustment.store');
     Route::post('accounts/coa', [AccountController::class, 'storeCoa'])->name('accounts.coa.store');
     Route::get('accounts/vouchers', [AccountController::class, 'vouchers'])->name('accounts.vouchers');
     Route::post('accounts/vouchers', [AccountController::class, 'storeVoucher'])->name('accounts.vouchers.store');

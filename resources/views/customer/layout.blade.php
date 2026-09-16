@@ -14,7 +14,7 @@
             <form class="customer-site-search" action="/products" method="GET"><input name="search" placeholder="Search for products, brands and more..."><select name="category"><option>All Categories</option></select><button aria-label="Search"><i class="bi bi-search"></i></button></form>
             <div class="customer-site-actions"><a href="/account/wishlist"><i class="bi bi-heart"></i></a><a href="/checkout"><i class="bi bi-bag"></i></a><a class="customer-site-account" href="{{ route('customer.dashboard') }}"><i class="bi bi-person-circle"></i><span>{{ $customer->full_name }}<small>My Account</small></span></a></div>
         </div>
-        <nav class="customer-site-nav"><a href="/products">Products</a><a href="/">Home</a><a href="/shops">Shops</a><a href="/brands">Brands</a><a href="/contact-us">Contact</a><a href="/blogs">Blogs</a></nav>
+        <nav class="customer-site-nav"><a href="/products">Products</a><a href="/">Home</a><a href="/brands">Brands</a><a href="/contact-us">Contact</a><a href="/blogs">Blogs</a></nav>
     </header>
     <div class="customer-shell">
         <aside class="customer-sidebar">

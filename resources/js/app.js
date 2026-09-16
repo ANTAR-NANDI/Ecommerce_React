@@ -157,16 +157,34 @@ document.addEventListener('DOMContentLoaded', () => {
         name.required = !productSelected;
         if (productSelected) name.value = '';
     };
+    const refreshPurchaseProductData = (row, fillBuyingPrice = false) => {
+        const option = row.querySelector('.product-select')?.selectedOptions[0];
+        const stock = row.querySelector('.line-stock');
+        const warehouseId = document.querySelector('[name="warehouse_id"]')?.value;
+
+        if (!option?.value) {
+            stock.textContent = '—';
+            return;
+        }
+
+        const warehouseStock = JSON.parse(option.dataset.warehouseStock || '{}');
+        stock.textContent = warehouseId ? (warehouseStock[warehouseId] ?? 0) : 'Select warehouse';
+        stock.classList.toggle('text-muted', !warehouseId);
+
+        if (fillBuyingPrice) row.querySelector('.line-cost').value = option.dataset.buyingPrice || 0;
+    };
     const namePurchaseFields = () => purchaseLines?.querySelectorAll('tr').forEach((row, index) => {
         row.querySelector('.product-select').name = `items[${index}][product_id]`;
         row.querySelector('.product-name').name = `items[${index}][product_name]`;
         row.querySelector('.line-qty').name = `items[${index}][quantity]`;
         row.querySelector('.line-cost').name = `items[${index}][unit_cost]`;
         toggleCustomItemName(row);
+        refreshPurchaseProductData(row);
     });
     document.querySelector('#add-purchase-line')?.addEventListener('click', () => { purchaseLines.append(document.querySelector('#purchase-line-template').content.cloneNode(true)); namePurchaseFields(); refreshPurchaseTotals(); });
     purchaseLines?.addEventListener('input', refreshPurchaseTotals);
-    purchaseLines?.addEventListener('change', (event) => { if (event.target.matches('.product-select')) toggleCustomItemName(event.target.closest('tr')); refreshPurchaseTotals(); });
+    purchaseLines?.addEventListener('change', (event) => { if (event.target.matches('.product-select')) { const row = event.target.closest('tr'); toggleCustomItemName(row); refreshPurchaseProductData(row, true); } refreshPurchaseTotals(); });
+    document.querySelector('[name="warehouse_id"]')?.addEventListener('change', () => purchaseLines?.querySelectorAll('tr').forEach((row) => refreshPurchaseProductData(row)));
     purchaseLines?.addEventListener('click', (event) => { if (event.target.closest('.remove-line') && purchaseLines.rows.length > 1) { event.target.closest('tr').remove(); namePurchaseFields(); refreshPurchaseTotals(); } });
     namePurchaseFields();
     refreshPurchaseTotals();

@@ -20,4 +20,5 @@ class Product extends Model
     public function sizes(): BelongsToMany { return $this->belongsToMany(Size::class)->withTimestamps(); }
     public function unit(): BelongsTo { return $this->belongsTo(Unit::class); }
     public function warehouseStocks(): HasMany { return $this->hasMany(WarehouseProductStock::class); }
+    public function reviews(): HasMany { return $this->hasMany(ProductReview::class); }
 }

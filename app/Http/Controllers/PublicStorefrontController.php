@@ -23,7 +23,7 @@ class PublicStorefrontController extends Controller
         $now = now();
         $categories = Category::with(['icon', 'banner', 'subcategories.icon'])
             ->where('is_active', true)->orderBy('display_order')->get();
-        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])
+        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])->withCount('reviews')->withAvg('reviews', 'rating')
             ->where('is_active', true)->latest()->take(24)->get();
         $promotions = Promotion::with('banner')->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
@@ -83,7 +83,7 @@ class PublicStorefrontController extends Controller
             'in_stock' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:newest,price_asc,price_desc,name_asc'],
         ]);
-        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])->where('is_active', true)
+        $products = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes'])->withCount('reviews')->withAvg('reviews', 'rating')->where('is_active', true)
             ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(fn ($nested) => $nested->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%")))
             ->when($filters['min_price'] ?? null, fn ($query, $price) => $query->where('selling_price', '>=', $price))
             ->when($filters['max_price'] ?? null, fn ($query, $price) => $query->where('selling_price', '<=', $price))
@@ -134,7 +134,7 @@ class PublicStorefrontController extends Controller
 
     public function product(string $slug): JsonResponse
     {
-        $product = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes', 'unit'])
+        $product = Product::with(['thumbnail', 'category', 'brand', 'color', 'size', 'colors', 'sizes', 'unit', 'reviews.customer'])->withCount('reviews')->withAvg('reviews', 'rating')
             ->where('is_active', true)->where('slug', $slug)->firstOrFail();
         $mediaById = Media::whereIn('id', $product->gallery_media_ids ?? [])->get()->keyBy('id');
         $gallery = collect($product->gallery_media_ids ?? [])->map(fn ($id) => $mediaById->get($id))
@@ -150,6 +150,8 @@ class PublicStorefrontController extends Controller
                 'colors' => $product->colors->map(fn ($color) => ['name' => $color->name, 'hex_code' => $color->hex_code])->whenEmpty(fn () => $product->color ? collect([['name' => $product->color->name, 'hex_code' => $product->color->hex_code]]) : collect())->values(),
                 'unit' => $product->unit?->name,
                 'gallery' => $gallery->map(fn (Media $media) => ['id' => $media->id, 'url' => $media->url]),
+                'reviews' => $product->reviews->sortByDesc('updated_at')->values()->map(fn ($review) => ['id' => $review->id, 'rating' => $review->rating, 'comment' => $review->comment, 'customer_name' => $review->customer->full_name, 'created_at' => $review->updated_at->toDateString()]),
+                'can_review' => auth('customer')->check(),
             ]),
         ]);
     }
@@ -168,6 +170,8 @@ class PublicStorefrontController extends Controller
             'color' => $product->colors->pluck('name')->first() ?? $product->color?->name, 'size' => $product->sizes->pluck('name')->first() ?? $product->size?->name, 'price' => round($salePrice, 2),
             'original_price' => $discount > 0 ? $originalPrice : null, 'discount' => $discount,
             'stock' => $product->stock_quantity,
+            'rating' => round((float) ($product->reviews_avg_rating ?? 0), 1),
+            'reviews_count' => $product->reviews_count ?? 0,
         ];
     }
 }
