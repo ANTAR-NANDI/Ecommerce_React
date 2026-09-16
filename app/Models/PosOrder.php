@@ -8,8 +8,30 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PosOrder extends Model
 {
-    protected $fillable=['order_number','warehouse_id','customer_name','customer_phone','payment_method','status','subtotal','total'];
-    protected function casts(): array { return ['subtotal'=>'decimal:2','total'=>'decimal:2']; }
-    public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
-    public function items(): HasMany { return $this->hasMany(PosOrderItem::class); }
+    protected $fillable = ['order_number', 'warehouse_id', 'customer_id', 'customer_name', 'customer_phone', 'payment_method', 'payment_method_id', 'status', 'subtotal', 'total'];
+
+    protected function casts(): array
+    {
+        return ['subtotal' => 'decimal:2', 'total' => 'decimal:2'];
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(PosOrderItem::class);
+    }
 }

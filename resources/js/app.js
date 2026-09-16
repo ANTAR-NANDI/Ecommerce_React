@@ -217,6 +217,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderPosCart();
     }
+    const customerSelect = document.querySelector('#pos-customer-id');
+    const syncPosCustomer = () => {
+        const option = customerSelect?.selectedOptions[0];
+        const registeredCustomer = Boolean(customerSelect?.value);
+        const name = document.querySelector('#pos-customer-name');
+        const phone = document.querySelector('#pos-customer-phone');
+        document.querySelector('#pos-walk-in-fields')?.classList.toggle('d-none', registeredCustomer);
+        if (registeredCustomer) {
+            if (name) { name.value = option?.dataset.name || ''; name.readOnly = true; }
+            if (phone) { phone.value = option?.dataset.phone || ''; phone.readOnly = true; }
+        } else {
+            if (name) name.readOnly = false;
+            if (phone) phone.readOnly = false;
+        }
+    };
+    customerSelect?.addEventListener('change', syncPosCustomer);
+    syncPosCustomer();
     const submitPosOrder = (status) => {
         if (!document.querySelector('#pos-warehouse')?.value) { window.alert('Select the warehouse for this sale first.'); return; }
         if (!posCart.size) { window.alert('Add at least one product to the cart.'); return; }
@@ -224,9 +241,11 @@ document.addEventListener('DOMContentLoaded', () => {
         form.querySelectorAll('input[data-pos-order-field]').forEach((field) => field.remove());
         const add = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; input.dataset.posOrderField = 'true'; form.append(input); };
         add('warehouse_id', document.querySelector('#pos-warehouse')?.value || '');
+        add('customer_id', customerSelect?.value || '');
         add('customer_name', document.querySelector('#pos-customer-name')?.value || '');
         add('customer_phone', document.querySelector('#pos-customer-phone')?.value || '');
-        add('payment_method', document.querySelector('#pos-payment-method')?.value || 'Cash');
+        const paymentMethod = document.querySelector('#pos-payment-method')?.value || '';
+        if (paymentMethod === 'due') add('payment_method', 'Due'); else add('payment_method_id', paymentMethod);
         add('status', status);
         [...posCart.values()].forEach((item, index) => { add(`items[${index}][product_id]`, item.id); add(`items[${index}][product_name]`, item.name); add(`items[${index}][quantity]`, item.quantity); add(`items[${index}][unit_price]`, item.price); });
         form.submit();
