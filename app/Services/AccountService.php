@@ -76,6 +76,40 @@ class AccountService
         return $voucherNo;
     }
 
+    /**
+     * Post a balanced multi-line entry, used for system-generated opening balances.
+     * Each entry must contain account_coa_id, entry_type, and amount.
+     */
+    public function postEntries(array $entries, array $context, ?int $userId = null): void
+    {
+        $debits = collect($entries)->where('entry_type', 'debit')->sum('amount');
+        $credits = collect($entries)->where('entry_type', 'credit')->sum('amount');
+
+        if (round((float) $debits, 2) !== round((float) $credits, 2) || $debits <= 0) {
+            throw ValidationException::withMessages(['items' => 'Ledger entries must have equal debit and credit totals.']);
+        }
+
+        DB::transaction(function () use ($entries, $context, $userId) {
+            foreach ($entries as $entry) {
+                AccountTransaction::create([
+                    'voucher_no' => $context['voucher_no'],
+                    'voucher_type' => $context['voucher_type'] ?? 'journal',
+                    'transaction_date' => $context['transaction_date'],
+                    'account_coa_id' => $entry['account_coa_id'],
+                    'entry_type' => $entry['entry_type'],
+                    'amount' => round((float) $entry['amount'], 2),
+                    'ledger_comment' => $context['ledger_comment'] ?? null,
+                    'supplier_id' => $context['supplier_id'] ?? null,
+                    'customer_id' => $context['customer_id'] ?? null,
+                    'purchase_id' => $context['purchase_id'] ?? null,
+                    'ecommerce_order_id' => $context['ecommerce_order_id'] ?? null,
+                    'pos_order_id' => $context['pos_order_id'] ?? null,
+                    'created_by' => $userId,
+                ]);
+            }
+        });
+    }
+
     private function ensureEntityHead(string $column, int $id, string $name, string $parentCode, string $type): AccountCoa
     {
         $existing = AccountCoa::where($column.'_id', $id)->first();

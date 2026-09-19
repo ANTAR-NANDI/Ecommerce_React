@@ -7,6 +7,9 @@ use App\Models\EcommerceOrder;
 use App\Models\Product;
 use App\Models\Warehouse;
 use App\Models\WarehouseProductStock;
+use App\Models\AccountCoa;
+use App\Models\AccountTransaction;
+use App\Services\AccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +18,7 @@ use Illuminate\View\View;
 
 class EcommerceOrderController extends Controller
 {
+    public function __construct(private readonly AccountService $accounts) {}
     public function index(Request $request): View
     {
         $status = $request->string('status')->toString();
@@ -55,7 +59,7 @@ class EcommerceOrderController extends Controller
             throw ValidationException::withMessages(['warehouse_id' => 'Choose the warehouse that will fulfil this order before processing it.']);
         }
 
-        DB::transaction(function () use ($order, $data) {
+        DB::transaction(function () use ($order, $data, $request) {
             $historyNote = $data['note'] ?? null;
             if ($data['status'] === 'processing') {
                 $warehouseQuery = Warehouse::whereKey($data['warehouse_id'])->where('is_active', true);
@@ -84,6 +88,9 @@ class EcommerceOrderController extends Controller
             $order->status = $data['status'];
             $order->save();
             $order->statusHistory()->create(['status' => $data['status'], 'note' => $historyNote]);
+            if ($data['status'] === 'delivered') {
+                $this->postDeliveryLedger($order, $request->user()->id);
+            }
         });
 
         return to_route('admin.orders.show', $order)->with('success', 'Order status updated.');
@@ -99,5 +106,46 @@ class EcommerceOrderController extends Controller
     private function authorizeWarehouse(EcommerceOrder $order): void
     {
         abort_unless(auth()->user()->isSuperAdmin() || $order->warehouse_id === auth()->user()->warehouse_id, 403);
+    }
+
+    private function postDeliveryLedger(EcommerceOrder $order, int $userId): void
+    {
+        if (AccountTransaction::where('ecommerce_order_id', $order->id)->exists()) {
+            return;
+        }
+
+        $order->loadMissing(['items.product', 'customer']);
+        $revenue = AccountCoa::where('code', '4001')->firstOrFail();
+        $inventory = AccountCoa::where('code', '10014')->firstOrFail();
+        $costOfGoods = AccountCoa::where('code', '5001')->firstOrFail();
+        $receivable = $order->customer
+            ? $this->accounts->ensureCustomerHead($order->customer)
+            : AccountCoa::where('head_name', 'Online Order Receivable')->where('account_type', 'asset')->first()
+                ?? $this->accounts->createChild(AccountCoa::where('code', '1001')->firstOrFail(), 'Online Order Receivable');
+
+        $this->accounts->postVoucher([
+            'voucher_type' => 'credit',
+            'transaction_date' => now()->toDateString(),
+            'debit_account_id' => $receivable->id,
+            'credit_account_id' => $revenue->id,
+            'amount' => $order->total,
+            'ledger_comment' => 'Ecommerce sale '.$order->order_number,
+            'customer_id' => $order->customer_id,
+            'ecommerce_order_id' => $order->id,
+        ], $userId);
+
+        $cost = $order->items->sum(fn ($item) => (float) $item->quantity * (float) ($item->product?->buying_price ?? 0));
+        if ($cost > 0) {
+            $this->accounts->postVoucher([
+                'voucher_type' => 'journal',
+                'transaction_date' => now()->toDateString(),
+                'debit_account_id' => $costOfGoods->id,
+                'credit_account_id' => $inventory->id,
+                'amount' => $cost,
+                'ledger_comment' => 'Cost of goods sold for '.$order->order_number,
+                'customer_id' => $order->customer_id,
+                'ecommerce_order_id' => $order->id,
+            ], $userId);
+        }
     }
 }
