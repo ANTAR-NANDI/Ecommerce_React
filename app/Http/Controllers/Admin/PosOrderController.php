@@ -101,6 +101,8 @@ class PosOrderController extends Controller
             'customer_name' => 'nullable|max:150', 'customer_phone' => 'nullable|max:30',
             'payment_method_id' => 'nullable|exists:payment_methods,id', 'payment_method' => 'nullable|in:Due',
             'status' => 'required|in:draft,completed', 'items' => 'required|array|min:1',
+            'discount_type' => 'nullable|in:fixed,percentage',
+            'discount_value' => 'nullable|numeric|decimal:0,2|min:0|max:999999999999.99',
             'items.*.product_id' => 'required|exists:products,id', 'items.*.product_name' => 'required|max:180',
             'items.*.quantity' => 'required|numeric|gt:0', 'items.*.unit_price' => 'required|numeric|min:0',
         ]);
@@ -114,17 +116,47 @@ class PosOrderController extends Controller
             throw ValidationException::withMessages(['payment_method_id' => 'This payment method has no account head. Configure it from Accounts → Payment Methods.']);
         }
 
+        $data['discount_type'] = $data['discount_type'] ?? 'fixed';
+        $data['discount_value'] = (float) ($data['discount_value'] ?? 0);
+        $subtotal = $this->subtotal($data['items']);
+        if ($data['discount_type'] === 'percentage' && $data['discount_value'] > 100) {
+            throw ValidationException::withMessages(['discount_value' => 'Percentage discount cannot exceed 100%.']);
+        }
+        if ($data['discount_type'] === 'fixed' && $data['discount_value'] > $subtotal) {
+            throw ValidationException::withMessages(['discount_value' => 'Discount cannot exceed the sale subtotal.']);
+        }
+
         return $data;
+    }
+
+    private function subtotal(array $items): float
+    {
+        return round(collect($items)->sum(fn ($item) => round($item['quantity'] * $item['unit_price'], 2)), 2);
+    }
+
+    private function totals(array $data): array
+    {
+        $subtotal = $this->subtotal($data['items']);
+        $discount = round($data['discount_type'] === 'percentage'
+            ? $subtotal * $data['discount_value'] / 100
+            : $data['discount_value'], 2);
+
+        return [
+            'subtotal' => $subtotal,
+            'discount_type' => $data['discount_type'],
+            'discount_value' => $data['discount_value'],
+            'discount_amount' => $discount,
+            'total' => round($subtotal - $discount, 2),
+        ];
     }
 
     private function createOrder(array $data): PosOrder
     {
-        $total = collect($data['items'])->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
         $customer = ! empty($data['customer_id']) ? Customer::find($data['customer_id']) : null;
         $method = ! empty($data['payment_method_id']) ? PaymentMethod::find($data['payment_method_id']) : null;
-        $order = PosOrder::create(['order_number' => 'POS-'.now()->format('ymdHis').'-'.random_int(100, 999), 'warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status'], 'subtotal' => $total, 'total' => $total]);
+        $order = PosOrder::create(['order_number' => 'POS-'.now()->format('ymdHis').'-'.random_int(100, 999), 'warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status']] + $this->totals($data));
         foreach ($data['items'] as $item) {
-            $order->items()->create($item + ['line_total' => $item['quantity'] * $item['unit_price']]);
+            $order->items()->create($item + ['line_total' => round($item['quantity'] * $item['unit_price'], 2)]);
         }
 
         return $order;
@@ -132,13 +164,12 @@ class PosOrderController extends Controller
 
     private function updateOrder(PosOrder $order, array $data): void
     {
-        $total = collect($data['items'])->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
         $customer = ! empty($data['customer_id']) ? Customer::find($data['customer_id']) : null;
         $method = ! empty($data['payment_method_id']) ? PaymentMethod::find($data['payment_method_id']) : null;
-        $order->update(['warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status'], 'subtotal' => $total, 'total' => $total]);
+        $order->update(['warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status']] + $this->totals($data));
         $order->items()->delete();
         foreach ($data['items'] as $item) {
-            $order->items()->create($item + ['line_total' => $item['quantity'] * $item['unit_price']]);
+            $order->items()->create($item + ['line_total' => round($item['quantity'] * $item['unit_price'], 2)]);
         }
     }
 

@@ -190,16 +190,36 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshPurchaseTotals();
 
     const posCart = new Map();
+    const posDiscountType = document.querySelector('#pos-discount-type');
+    const posDiscountValue = document.querySelector('#pos-discount-value');
+    const posTotals = () => {
+        const roundMoney = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+        const subtotal = roundMoney([...posCart.values()].reduce((sum, item) => sum + roundMoney(item.price * item.quantity), 0));
+        const value = Number(posDiscountValue?.value || 0);
+        const percentage = posDiscountType?.value === 'percentage';
+        const max = percentage ? 100 : subtotal;
+        if (posDiscountValue) posDiscountValue.max = String(max);
+        const error = !Number.isFinite(value) || value < 0 ? 'Enter a valid, non-negative discount.'
+            : value > max ? (percentage ? 'Percentage discount cannot exceed 100%.' : 'Discount cannot exceed the sale subtotal.') : '';
+        posDiscountValue?.setCustomValidity(error);
+        document.querySelector('#pos-discount-error')?.replaceChildren(error);
+        const discount = roundMoney(percentage ? subtotal * value / 100 : value);
+        return { subtotal, discount, total: roundMoney(subtotal - discount), valid: !error && (!posDiscountValue || posDiscountValue.validity.valid) };
+    };
     const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
     const renderPosCart = () => {
         const cart = document.querySelector('#pos-cart'); if (!cart) return;
-        const rows = [...posCart.values()]; const total = rows.reduce((sum,item)=>sum+item.price*item.quantity,0);
+        const rows = [...posCart.values()]; const { subtotal, discount, total, valid } = posTotals();
         cart.innerHTML = rows.length ? rows.map(item => `<div class="d-flex align-items-center gap-2"><div class="flex-grow-1"><div class="fw-semibold small">${escapeHtml(item.name)}</div><div class="small" style="color:var(--brand)">$${item.price.toFixed(2)}</div></div><div class="input-group input-group-sm" style="width:95px"><button class="btn btn-outline-secondary pos-quantity" data-id="${item.id}" data-change="-1">−</button><span class="input-group-text bg-white">${item.quantity}</span><button class="btn btn-outline-secondary pos-quantity" data-id="${item.id}" data-change="1">+</button></div></div>`).join('') : '<div class="text-center py-5 text-muted"><i class="bi bi-basket fs-2 d-block mb-2"></i>Cart is empty</div>';
-        document.querySelector('#pos-subtotal')?.replaceChildren(`$${total.toFixed(2)}`); document.querySelector('#pos-total')?.replaceChildren(`$${total.toFixed(2)}`);
+        document.querySelector('#pos-subtotal')?.replaceChildren(`$${subtotal.toFixed(2)}`);
+        document.querySelector('#pos-discount-amount')?.replaceChildren(valid ? `−$${discount.toFixed(2)}` : '—');
+        document.querySelector('#pos-total')?.replaceChildren(valid ? `$${total.toFixed(2)}` : '—');
     };
+    posDiscountType?.addEventListener('change', renderPosCart);
+    posDiscountValue?.addEventListener('input', renderPosCart);
     document.querySelector('#pos-products')?.addEventListener('click', (event) => { const button=event.target.closest('.pos-add'); if(!button || button.disabled)return; const item=posCart.get(button.dataset.id)||{id:button.dataset.id,name:button.dataset.name,price:parseFloat(button.dataset.price),quantity:0,available:parseFloat(button.dataset.available)}; if(item.quantity >= item.available) { window.alert(`Only ${item.available} item(s) are available in this warehouse.`); return; } item.quantity++; posCart.set(item.id,item); renderPosCart(); });
     document.querySelector('#pos-cart')?.addEventListener('click',(event)=>{const button=event.target.closest('.pos-quantity');if(!button)return;const item=posCart.get(button.dataset.id);const change=parseInt(button.dataset.change);if(change > 0 && item.quantity >= item.available){window.alert(`Only ${item.available} item(s) are available in this warehouse.`);return;}item.quantity+=change;if(item.quantity<1)posCart.delete(item.id);renderPosCart();});
-    document.querySelector('#pos-clear')?.addEventListener('click',()=>{posCart.clear();renderPosCart();});
+    document.querySelector('#pos-clear')?.addEventListener('click',()=>{posCart.clear();if(posDiscountValue)posDiscountValue.value='0';renderPosCart();});
     const applyPosFilters = () => { const search=document.querySelector('#pos-search')?.value.toLowerCase() || ''; const brand=document.querySelector('#pos-brand')?.value || ''; document.querySelectorAll('.pos-product').forEach(card=>card.classList.toggle('d-none',!card.dataset.name.includes(search) || (brand && card.dataset.brand !== brand))); };
     document.querySelector('#pos-search')?.addEventListener('input',applyPosFilters);
     document.querySelector('#pos-brand')?.addEventListener('change',applyPosFilters);
@@ -237,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitPosOrder = (status) => {
         if (!document.querySelector('#pos-warehouse')?.value) { window.alert('Select the warehouse for this sale first.'); return; }
         if (!posCart.size) { window.alert('Add at least one product to the cart.'); return; }
+        if (!posTotals().valid) { posDiscountValue?.reportValidity(); return; }
         const form = document.querySelector('#pos-order-form'); if (!form) return;
         form.querySelectorAll('input[data-pos-order-field]').forEach((field) => field.remove());
         const add = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; input.dataset.posOrderField = 'true'; form.append(input); };
@@ -247,6 +268,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const paymentMethod = document.querySelector('#pos-payment-method')?.value || '';
         if (paymentMethod === 'due') add('payment_method', 'Due'); else add('payment_method_id', paymentMethod);
         add('status', status);
+        add('discount_type', posDiscountType?.value || 'fixed');
+        add('discount_value', posDiscountValue?.value || '0');
         [...posCart.values()].forEach((item, index) => { add(`items[${index}][product_id]`, item.id); add(`items[${index}][product_name]`, item.name); add(`items[${index}][quantity]`, item.quantity); add(`items[${index}][unit_price]`, item.price); });
         form.submit();
     };
