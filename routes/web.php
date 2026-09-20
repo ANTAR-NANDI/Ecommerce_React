@@ -123,6 +123,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::get('orders/{order}/invoice', [EcommerceOrderController::class,'invoice'])->name('orders.invoice');
     Route::resource('suppliers', SupplierController::class)->except('show');
     Route::get('accounts/coa', [AccountController::class, 'coa'])->name('accounts.coa');
+    Route::get('accounts/coa/print', [AccountController::class, 'printCoa'])->name('accounts.coa.print');
     Route::get('accounts/sub-accounts', [AccountController::class, 'subAccounts'])->name('accounts.sub-accounts');
     Route::get('accounts/predefined-accounts', [AccountController::class, 'predefinedAccounts'])->name('accounts.predefined-accounts');
     Route::put('accounts/predefined-accounts', [AccountController::class, 'updatePredefinedAccounts'])->name('accounts.predefined-accounts.update');
@@ -130,6 +131,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::post('accounts/financial-years', [AccountController::class, 'storeFinancialYear'])->name('accounts.financial-years.store');
     Route::put('accounts/financial-years/{financialYear}/close', [AccountController::class, 'closeFinancialYear'])->name('accounts.financial-years.close');
     Route::get('accounts/opening-balances', [AccountController::class, 'openingBalances'])->name('accounts.opening-balances');
+    Route::get('accounts/opening-balances/{openingBalance}/print', [AccountController::class, 'printOpeningBalance'])->name('accounts.opening-balances.print');
     Route::post('accounts/opening-balances', [AccountController::class, 'storeOpeningBalance'])->name('accounts.opening-balances.store');
     Route::get('accounts/payment-methods', [AccountController::class, 'paymentMethods'])->name('accounts.payment-methods');
     Route::post('accounts/payment-methods', [AccountController::class, 'storePaymentMethod'])->name('accounts.payment-methods.store');
@@ -139,6 +141,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::post('accounts/cash-adjustment', [AccountController::class, 'storeCashAdjustment'])->name('accounts.cash-adjustment.store');
     Route::post('accounts/coa', [AccountController::class, 'storeCoa'])->name('accounts.coa.store');
     Route::get('accounts/vouchers', [AccountController::class, 'vouchers'])->name('accounts.vouchers');
+    Route::get('accounts/vouchers/{voucherNo}/print', [AccountController::class, 'printVoucher'])->name('accounts.vouchers.print');
     Route::post('accounts/vouchers', [AccountController::class, 'storeVoucher'])->name('accounts.vouchers.store');
     Route::get('accounts/reports/{report?}', [AccountReportController::class, 'index'])->name('accounts.reports');
     Route::get('reports', [AccountReportController::class, 'index'])->name('reports.index');
@@ -151,6 +154,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin.access'])->gro
     Route::get('pos/orders/{order}/invoice', [PosOrderController::class,'invoice'])->name('pos.invoice');
     Route::get('purchases', [PurchaseController::class,'index'])->name('purchases.index');
     Route::get('purchases/create', [PurchaseController::class,'create'])->name('purchases.create');
+    Route::get('purchases/{purchase}/invoice', [PurchaseController::class,'invoice'])->name('purchases.invoice');
     Route::post('purchases', [PurchaseController::class,'store'])->name('purchases.store');
     Route::resource('warehouses', WarehouseController::class)->except('show');
     Route::get('products', [ProductController::class, 'index'])->name('products.index');

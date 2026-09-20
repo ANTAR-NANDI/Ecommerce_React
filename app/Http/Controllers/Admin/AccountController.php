@@ -20,6 +20,12 @@ class AccountController extends Controller
         return view('admin.accounts.coa', ['nodes' => $nodes, 'groups' => AccountCoa::where('is_group', true)->orderBy('code')->get()]);
     }
 
+    public function printCoa(): View
+    {
+        $this->accounts->syncProfileHeads();
+        return view('admin.accounts.coa-print', ['nodes' => AccountCoa::with('children.children.children.children')->whereNull('parent_id')->orderBy('code')->get()]);
+    }
+
     public function subAccounts(): View
     {
         $this->accounts->syncProfileHeads();
@@ -40,9 +46,11 @@ class AccountController extends Controller
 
     public function openingBalances(): View { return view('admin.accounts.opening-balances', ['balances'=>\App\Models\OpeningBalance::with(['year','items'])->latest()->paginate(15),'years'=>FinancialYear::whereNull('closed_at')->latest('start_date')->get(),'accounts'=>AccountCoa::where('is_group',false)->orderBy('code')->get()]); }
 
+    public function printOpeningBalance(\App\Models\OpeningBalance $openingBalance): View { return view('admin.accounts.opening-balance-print', ['balance' => $openingBalance->load(['year', 'items.account'])]); }
+
     public function paymentMethods(): View { $cash=AccountCoa::where('code','10011')->firstOrFail();\App\Models\PaymentMethod::firstOrCreate(['name'=>'Cash in Hand'],['account_coa_id'=>$cash->id,'is_fixed'=>true]);\App\Models\PaymentMethod::whereDoesntHave('account')->each(function($method)use($cash){$method->update(['account_coa_id'=>$cash->id,'is_fixed'=>true]);});return view('admin.accounts.payment-methods',['methods'=>\App\Models\PaymentMethod::with('account')->latest()->paginate(15)]); }
     public function storePaymentMethod(Request $request): RedirectResponse { $data=$request->validate(['name'=>'required|string|max:100|unique:payment_methods,name']);$parent=AccountCoa::where('code','10012')->firstOrFail();$account=$this->accounts->createChild($parent,'Cash at '.$data['name']);\App\Models\PaymentMethod::create(['name'=>$data['name'],'account_coa_id'=>$account->id]);return back()->with('success',"Payment method created under Bank Accounts as {$account->head_name}."); }
-    public function settlement(string $type): View { abort_unless(in_array($type,['supplier-payment','customer-receive']),404);$this->paymentMethods();return view('admin.accounts.settlement',['type'=>$type,'suppliers'=>Supplier::orderBy('name')->get(),'customers'=>Customer::orderBy('first_name')->get(),'methods'=>\App\Models\PaymentMethod::with('account')->get(),'purchases'=>Purchase::latest('purchase_date')->get(),'orders'=>EcommerceOrder::latest()->get()]); }
+    public function settlement(string $type): View { abort_unless(in_array($type,['supplier-payment','customer-receive']),404);$this->paymentMethods();$transactions=AccountTransaction::with(['account','supplier','customer'])->where('voucher_type',$type==='supplier-payment'?'debit':'credit')->whereNotNull($type==='supplier-payment'?'supplier_id':'customer_id')->latest('transaction_date')->latest('id')->paginate(20);return view('admin.accounts.settlement',['type'=>$type,'suppliers'=>Supplier::orderBy('name')->get(),'customers'=>Customer::orderBy('first_name')->get(),'methods'=>\App\Models\PaymentMethod::with('account')->get(),'purchases'=>Purchase::latest('purchase_date')->get(),'orders'=>EcommerceOrder::latest()->get(),'transactions'=>$transactions]); }
     public function storeSettlement(Request $request,string $type): RedirectResponse { abort_unless(in_array($type,['supplier-payment','customer-receive']),404);$data=$request->validate(['entity_id'=>'required|integer','payment_method_id'=>'required|exists:payment_methods,id','amount'=>'required|numeric|gt:0','transaction_date'=>'required|date','remark'=>'nullable|max:1000']);$method=\App\Models\PaymentMethod::findOrFail($data['payment_method_id']);if($type==='supplier-payment'){$supplier=Supplier::findOrFail($data['entity_id']);$entity=AccountCoa::where('supplier_id',$supplier->id)->firstOrFail();$voucher=$this->accounts->postVoucher(['voucher_type'=>'debit','transaction_date'=>$data['transaction_date'],'debit_account_id'=>$entity->id,'credit_account_id'=>$method->account_coa_id,'amount'=>$data['amount'],'ledger_comment'=>$data['remark'],'supplier_id'=>$supplier->id],$request->user()->id);}else{$customer=Customer::findOrFail($data['entity_id']);$entity=AccountCoa::where('customer_id',$customer->id)->firstOrFail();$voucher=$this->accounts->postVoucher(['voucher_type'=>'credit','transaction_date'=>$data['transaction_date'],'debit_account_id'=>$method->account_coa_id,'credit_account_id'=>$entity->id,'amount'=>$data['amount'],'ledger_comment'=>$data['remark'],'customer_id'=>$customer->id],$request->user()->id);}return back()->with('success',"Payment saved as {$voucher}."); }
     public function cashAdjustment(): View { return view('admin.accounts.cash-adjustment',['cash'=>AccountCoa::where('code','10011')->firstOrFail()]); }
     public function storeCashAdjustment(Request $request): RedirectResponse { $data=$request->validate(['transaction_date'=>'required|date','adjustment_type'=>'required|in:debit,credit','amount'=>'required|numeric|gt:0','remark'=>'nullable|max:1000']);$cash=AccountCoa::where('code','10011')->firstOrFail();$adjustment=AccountCoa::where('head_name','Cash Adjustment')->first()??$this->accounts->createChild(AccountCoa::where('code','500')->firstOrFail(),'Cash Adjustment');$voucher=$this->accounts->postVoucher(['voucher_type'=>'journal','transaction_date'=>$data['transaction_date'],'debit_account_id'=>$data['adjustment_type']==='debit'?$cash->id:$adjustment->id,'credit_account_id'=>$data['adjustment_type']==='credit'?$cash->id:$adjustment->id,'amount'=>$data['amount'],'ledger_comment'=>$data['remark']],$request->user()->id);return back()->with('success',"Cash adjustment {$voucher} saved."); }
@@ -82,10 +90,27 @@ class AccountController extends Controller
         return view('admin.accounts.vouchers', [
             'accounts' => AccountCoa::where('is_group', false)->orderBy('code')->get(),
             'transactions' => AccountTransaction::with('account')->where('voucher_type', $voucherType)->latest('transaction_date')->latest('id')->paginate(20),
-            'suppliers' => Supplier::orderBy('name')->get(), 'customers' => Customer::orderBy('first_name')->get(),
-            'purchases' => Purchase::latest('purchase_date')->limit(100)->get(), 'orders' => EcommerceOrder::latest()->limit(100)->get(),
             'voucherType' => $voucherType,
             'voucherLabel' => ucfirst($voucherType).' Voucher',
+        ]);
+    }
+
+    public function printVoucher(string $voucherNo): View
+    {
+        $entries = AccountTransaction::with(['account', 'supplier', 'customer'])
+            ->where('voucher_no', $voucherNo)
+            ->orderBy('entry_type')
+            ->orderBy('id')
+            ->get();
+
+        abort_unless($entries->isNotEmpty(), 404);
+
+        return view('admin.accounts.voucher-print', [
+            'voucherNo' => $voucherNo,
+            'entries' => $entries,
+            'voucherType' => $entries->first()->voucher_type,
+            'transactionDate' => $entries->first()->transaction_date,
+            'narration' => $entries->first()->ledger_comment,
         ]);
     }
 
@@ -95,8 +120,6 @@ class AccountController extends Controller
             'voucher_type' => ['required', 'in:debit,credit,contra,journal'], 'transaction_date' => ['required', 'date'],
             'debit_account_id' => ['required', 'different:credit_account_id', 'exists:account_coas,id'], 'credit_account_id' => ['required', 'exists:account_coas,id'],
             'amount' => ['required', 'numeric', 'gt:0'], 'ledger_comment' => ['nullable', 'string', 'max:2000'],
-            'supplier_id' => ['nullable', 'exists:suppliers,id'], 'customer_id' => ['nullable', 'exists:customers,id'],
-            'purchase_id' => ['nullable', 'exists:purchases,id'], 'sale_id' => ['nullable', 'integer'],
         ]);
         $voucher = $this->accounts->postVoucher($data, $request->user()->id);
         return to_route('admin.accounts.vouchers', ['type' => $data['voucher_type']])->with('success', "Voucher {$voucher} posted with balanced debit and credit entries.");

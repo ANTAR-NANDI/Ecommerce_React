@@ -62,11 +62,13 @@ class AccountService
         $amount = round((float) $data['amount'], 2);
         $voucherNo = strtoupper($data['voucher_type']).'-'.now()->format('YmdHis').'-'.random_int(100, 999);
         DB::transaction(function () use ($data, $amount, $voucherNo, $userId) {
+            $accounts = AccountCoa::whereKey([$data['debit_account_id'], $data['credit_account_id']])->get()->keyBy('id');
             foreach ([['account_coa_id' => $data['debit_account_id'], 'entry_type' => 'debit'], ['account_coa_id' => $data['credit_account_id'], 'entry_type' => 'credit']] as $entry) {
+                $account = $accounts->get($entry['account_coa_id']);
                 AccountTransaction::create($entry + [
                     'voucher_no' => $voucherNo, 'voucher_type' => $data['voucher_type'], 'transaction_date' => $data['transaction_date'],
                     'amount' => $amount, 'ledger_comment' => $data['ledger_comment'] ?? null,
-                    'supplier_id' => $data['supplier_id'] ?? null, 'customer_id' => $data['customer_id'] ?? null,
+                    'supplier_id' => $data['supplier_id'] ?? $account?->supplier_id, 'customer_id' => $data['customer_id'] ?? $account?->customer_id,
                     'employee_id' => $data['employee_id'] ?? null, 'purchase_id' => $data['purchase_id'] ?? null,
                     'sale_id' => $data['sale_id'] ?? null, 'pos_order_id' => $data['pos_order_id'] ?? null, 'ecommerce_order_id' => $data['ecommerce_order_id'] ?? null, 'created_by' => $userId,
                 ]);

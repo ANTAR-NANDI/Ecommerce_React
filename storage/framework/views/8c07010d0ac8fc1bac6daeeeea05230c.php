@@ -2,7 +2,7 @@
 <?php $__env->startSection('content'); ?>
 <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 content-heading mb-4">
     <div><div class="small text-uppercase fw-semibold" style="color:var(--brand)">Accounts · Reports</div><h1><?php echo e($result['title']); ?></h1><p>Live report generated from the current business and accounting records.</p></div>
-    <button type="button" class="btn btn-light border" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print report</button>
+    <div class="d-flex gap-2 no-print"><button type="button" class="btn btn-light border" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button><button type="button" class="btn text-white" style="background:var(--brand)" onclick="window.print()"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button></div>
 </div>
 
 <div class="panel mb-4 d-print-none">

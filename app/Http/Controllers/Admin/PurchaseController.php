@@ -9,6 +9,7 @@ use App\Models\Warehouse;
 use App\Models\Supplier;
 use App\Models\WarehouseProductStock;
 use App\Models\AccountCoa;
+use App\Models\AccountTransaction;
 use App\Services\AccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class PurchaseController extends Controller
     public function __construct(private readonly AccountService $accounts) {}
     public function index(): View { return view('admin.purchases.index', ['purchases' => Purchase::with(['warehouse','supplier'])->latest('purchase_date')->paginate(12)]); }
     public function create(): View { return view('admin.purchases.create', ['warehouses'=>Warehouse::where('is_active',true)->orderBy('name')->get(), 'suppliers'=>Supplier::where('is_active',true)->orderBy('name')->get(), 'products'=>Product::with('warehouseStocks')->orderBy('name')->get(), 'nextNumber'=>'PUR-'.now()->format('ymd').'-'.str_pad((string)(Purchase::count()+1),4,'0',STR_PAD_LEFT)]); }
+    public function invoice(Purchase $purchase): View { return view('admin.purchases.invoice', ['purchase' => $purchase->load(['warehouse', 'supplier', 'items']), 'vouchers' => AccountTransaction::where('purchase_id', $purchase->id)->pluck('voucher_no')->filter()->unique()->values()]); }
     public function store(Request $request): RedirectResponse
     {
         $data=$request->validate(['warehouse_id'=>'required|exists:warehouses,id','supplier_id'=>'required|exists:suppliers,id','invoice_number'=>'nullable|max:100','purchase_date'=>'required|date','status'=>'required|in:draft,ordered,received','discount'=>'nullable|numeric|min:0','tax'=>'nullable|numeric|min:0','notes'=>'nullable','items'=>'required|array|min:1','items.*.product_id'=>'nullable|exists:products,id','items.*.product_name'=>'nullable|max:180','items.*.quantity'=>'required|numeric|gt:0','items.*.unit_cost'=>'required|numeric|min:0']);

@@ -1,0 +1,7 @@
+<?php $__env->startSection('title','Chart of Accounts'); ?>
+<?php $__env->startSection('content'); ?>
+<div class="d-flex justify-content-between align-items-center mb-4 no-print"><div class="content-heading"><h1>Chart of Accounts</h1><p>Hierarchical account tree</p></div><button type="button" class="btn text-white" style="background:var(--brand)" onclick="window.print()"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button></div>
+<article class="panel invoice-sheet mx-auto"><header class="border-bottom pb-4 mb-4"><div class="brand-name fs-4">EBay</div><div class="text-muted small mt-2">Chart of accounts - <?php echo e(now()->format('d M Y')); ?></div></header><ul class="list-unstyled mb-0"><?php $draw=null;$draw=function($accounts,$depth=0)use(&$draw){foreach($accounts as $account){echo '<li class="py-2" style="padding-left:'.($depth*28).'px"><span class="me-2 text-muted">'.e($account->code).'</span><strong class="'.($account->is_group?'':'fw-normal').'">'.e($account->head_name).'</strong><span class="ms-2 badge text-bg-light border">'.e(ucfirst($account->account_type)).($account->is_group?' group':'').'</span></li>';if($account->children->isNotEmpty())$draw($account->children,$depth+1);}};$draw($nodes);?></ul></article>
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.admin', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH F:\laragon\www\Ecommerce\resources\views/admin/accounts/coa-print.blade.php ENDPATH**/ ?>
