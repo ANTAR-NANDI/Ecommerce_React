@@ -25,6 +25,7 @@ class AccountReportController extends Controller
         'todays-report' => "Today's Report", 'todays-customer-receipt' => "Today's Customer Receipt",
         'sales' => 'Sales Report', 'user-wise-sales' => 'User Wise Sales Report', 'due' => 'Due Report',
         'shipping-cost' => 'Shipping Cost Report', 'purchase' => 'Purchase Report',
+        'product-price-comparison' => 'Product Price Comparison Report',
         'purchase-category-wise' => 'Purchase Report (Category Wise)', 'sales-product-wise' => 'Sales Report (Product Wise)',
         'sales-category-wise' => 'Sales Report (Category Wise)', 'sales-return' => 'Sales Return',
         'supplier-return' => 'Supplier Return', 'tax' => 'Tax Report', 'profit-sale-wise' => 'Profit Report (Sale Wise)',
@@ -80,6 +81,7 @@ class AccountReportController extends Controller
             'due' => $this->due($filters),
             'shipping-cost' => $this->shipping($filters),
             'purchase' => $this->purchases($filters),
+            'product-price-comparison' => $this->productPriceComparison($filters),
             'purchase-category-wise' => $this->purchaseByCategory($filters),
             'sales-product-wise' => $this->salesByProduct($filters),
             'sales-category-wise' => $this->salesByCategory($filters),
@@ -205,6 +207,39 @@ class AccountReportController extends Controller
     {
         $purchases = $this->purchasesQuery($filters)->latest('purchase_date')->get();
         return $this->base('Purchase Report', ['Date', 'Purchase', 'Supplier', 'Warehouse', 'Status', 'Items', 'Tax', 'Total'], $purchases->map(fn ($p) => [$p->purchase_date->format('d M Y'), $p->purchase_number, $p->supplier?->name ?: $p->supplier_name, $p->warehouse->name, ucfirst($p->status), number_format((float) $p->items->sum('quantity'), 3), $this->money($p->tax), $this->money($p->total)]), ['Purchases' => $purchases->count(), 'Tax' => $purchases->sum('tax'), 'Total' => $purchases->sum('total')], ['date', 'supplier', 'product', 'category', 'warehouse']);
+    }
+
+    private function productPriceComparison(array $filters): array
+    {
+        $items = PurchaseItem::with(['purchase', 'product'])
+            ->whereHas('purchase', function (Builder $query) use ($filters) {
+                $query->where('status', 'received')
+                    ->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('purchase_date', '>=', $date))
+                    ->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('purchase_date', '<=', $date));
+            })
+            ->when($filters['product_id'] ?? null, fn ($query, $id) => $query->where('product_id', $id))
+            ->orderByDesc(Purchase::select('purchase_date')->whereColumn('purchases.id', 'purchase_items.purchase_id')->limit(1))
+            ->orderByDesc('purchase_id')
+            ->orderBy('id')
+            ->get();
+
+        return $this->base(
+            'Product Price Comparison Report',
+            ['Purchase Date', 'Supplier', 'Product', 'SKU', 'Purchase Reference', 'Quantity', 'Unit Cost', 'Line Total'],
+            $items->map(fn ($item) => [
+                $item->purchase->purchase_date->format('d M Y'),
+                $item->purchase->supplier_name,
+                $item->product_name,
+                $item->product?->sku ?? '—',
+                $item->purchase->purchase_number,
+                number_format((float) $item->quantity, 3),
+                $this->money($item->unit_cost),
+                $this->money($item->line_total),
+            ]),
+            [],
+            ['date', 'product'],
+            'Received purchases only. Unit costs are the prices saved on each purchase, before purchase-level discounts and tax. Select a product to compare supplier prices over time.',
+        );
     }
 
     private function purchaseByCategory(array $filters): array
