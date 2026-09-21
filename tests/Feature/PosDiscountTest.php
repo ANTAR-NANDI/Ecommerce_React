@@ -42,9 +42,22 @@ class PosDiscountTest extends TestCase
         $this->assertSame('175.00', $order->total);
         $this->assertEquals(8, WarehouseProductStock::sole()->quantity);
         $entries = AccountTransaction::where('pos_order_id', $order->id)->get();
-        $this->assertCount(2, $entries);
-        $this->assertEquals(175, $entries->where('entry_type', 'debit')->sum('amount'));
-        $this->assertEquals(175, $entries->where('entry_type', 'credit')->sum('amount'));
+        $this->assertCount(4, $entries);
+        $this->assertEquals(275, $entries->where('entry_type', 'debit')->sum('amount'));
+        $this->assertEquals(275, $entries->where('entry_type', 'credit')->sum('amount'));
+        $this->assertDatabaseHas('pos_order_items', ['pos_order_id' => $order->id, 'unit_cost' => 50]);
+        $this->assertDatabaseHas('account_transactions', [
+            'pos_order_id' => $order->id,
+            'account_coa_id' => AccountCoa::where('code', '5001')->value('id'),
+            'entry_type' => 'debit',
+            'amount' => 100,
+        ]);
+        $this->assertDatabaseHas('account_transactions', [
+            'pos_order_id' => $order->id,
+            'account_coa_id' => AccountCoa::where('code', '10014')->value('id'),
+            'entry_type' => 'credit',
+            'amount' => 100,
+        ]);
         $this->get(route('admin.pos.invoice', $order))->assertOk()->assertSee('Subtotal')->assertSee('Discount')->assertSee('$25.00')->assertSee('$175.00');
     }
 
@@ -71,6 +84,11 @@ class PosDiscountTest extends TestCase
         $this->assertSame('174.98', $order->fresh()->total);
         $head = AccountCoa::where('customer_id', $customer->id)->firstOrFail();
         $this->assertDatabaseHas('account_transactions', ['pos_order_id' => $order->id, 'account_coa_id' => $head->id, 'entry_type' => 'debit', 'amount' => 174.98]);
+        $this->assertDatabaseMissing('account_transactions', [
+            'pos_order_id' => $order->id,
+            'account_coa_id' => AccountCoa::where('code', '4001')->value('id'),
+            'customer_id' => $customer->id,
+        ]);
         $this->assertEquals(8, WarehouseProductStock::sole()->quantity);
     }
 

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\{AccountCoa, AccountTransaction, Category, Customer, EcommerceOrder, EcommerceOrderItem, PosOrder, Product, Purchase, PurchaseItem, Supplier, User, Warehouse, WarehouseProductStock};
+use App\Models\{AccountCoa, AccountTransaction, Category, Customer, EcommerceOrder, EcommerceOrderItem, PosOrder, PosOrderItem, Product, Purchase, PurchaseItem, Supplier, User, Warehouse, WarehouseProductStock};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -109,6 +109,11 @@ class AccountReportController extends Controller
     private function book(array $filters, string $codePrefix, string $title): array
     {
         $ids = AccountCoa::where('code', 'like', $codePrefix.'%')->pluck('id');
+        return $this->bookForAccounts($filters, $ids, $title);
+    }
+
+    private function bookForAccounts(array $filters, Collection $ids, string $title): array
+    {
         $entries = $this->ledgerQuery($filters)->whereIn('account_coa_id', $ids)->orderBy('transaction_date')->orderBy('id')->get();
         $running = 0;
         $rows = $entries->map(function ($entry) use (&$running) { $running += $entry->entry_type === 'debit' ? (float) $entry->amount : -(float) $entry->amount; return [$entry->transaction_date->format('d M Y'), $entry->voucher_no, $entry->account->head_name, $entry->ledger_comment ?: '—', $entry->entry_type === 'debit' ? $this->money($entry->amount) : '—', $entry->entry_type === 'credit' ? $this->money($entry->amount) : '—', $this->money($running)]; });
@@ -162,8 +167,25 @@ class AccountReportController extends Controller
 
     private function balanceSheet(array $filters): array
     {
-        $balances = $this->balances($filters)->filter(fn ($r) => in_array($r['account']->account_type, ['asset', 'liability', 'equity'], true));
-        return $this->base('Balance Sheet', ['Type', 'Code', 'Account Head', 'Balance'], $balances->map(fn ($r) => [ucfirst($r['account']->account_type), $r['account']->code, $r['account']->head_name, $this->money($r['normal'])]), ['Assets' => $balances->filter(fn ($r) => $r['account']->account_type === 'asset')->sum('normal'), 'Liabilities' => $balances->filter(fn ($r) => $r['account']->account_type === 'liability')->sum('normal'), 'Equity' => $balances->filter(fn ($r) => $r['account']->account_type === 'equity')->sum('normal')]);
+        $allBalances = $this->balances($filters);
+        $balances = $allBalances->filter(fn ($r) => in_array($r['account']->account_type, ['asset', 'liability', 'equity'], true));
+        $assets = $balances->filter(fn ($r) => $r['account']->account_type === 'asset')->sum('normal');
+        $liabilities = $balances->filter(fn ($r) => $r['account']->account_type === 'liability')->sum('normal');
+        $baseEquity = $balances->filter(fn ($r) => $r['account']->account_type === 'equity')->sum('normal');
+        $income = $allBalances->filter(fn ($r) => $r['account']->account_type === 'income')->sum('normal');
+        $expenses = $allBalances->filter(fn ($r) => $r['account']->account_type === 'expense')->sum('normal');
+        $currentEarnings = round($income - $expenses, 2);
+        $equity = $baseEquity + $currentEarnings;
+        $currentEarningsRow = ['Equity', 'CURRENT-YEAR', $currentEarnings >= 0 ? 'Current Year Profit' : 'Current Year Loss', $this->money($currentEarnings)];
+        $rows = $balances->map(fn ($r) => [ucfirst($r['account']->account_type), $r['account']->code, $r['account']->head_name, $this->money($r['normal'])]);
+        $rows->push($currentEarningsRow);
+
+        return $this->base('Balance Sheet', ['Type', 'Code', 'Account Head', 'Balance'], $rows, [
+            'Assets' => $assets,
+            'Liabilities' => $liabilities,
+            'Equity' => $equity,
+            'Current Year Profit / (Loss)' => $currentEarnings,
+        ], ['date'], 'Equity includes the selected period’s current profit or loss.');
     }
 
     private function fixedAssets(array $filters): array
@@ -172,7 +194,11 @@ class AccountReportController extends Controller
         return $this->base('Fixed Asset Schedule', ['Code', 'Asset Account', 'Book Value'], $rows->map(fn ($r) => [$r['account']->code, $r['account']->head_name, $this->money($r['normal'])]), ['Book Value' => $rows->sum('normal')], ['date'], 'Fixed assets are derived from non-current asset ledger heads.');
     }
 
-    private function receiptPayment(array $filters): array { return $this->book($filters, '1001', 'Receipt & Payment'); }
+    private function receiptPayment(array $filters): array
+    {
+        $ids = AccountCoa::where('code', '10011')->orWhere('code', 'like', '10012%')->pluck('id');
+        return $this->bookForAccounts($filters, $ids, 'Receipt & Payment');
+    }
     private function bankReconciliation(array $filters): array { $result = $this->book($filters, '10012', 'Bank Reconciliation Report'); $result['notice'] = 'This compares recorded bank-ledger receipts and payments. Statement matching can be added when bank statements are imported.'; return $result; }
 
     private function coaPrint(): array
@@ -192,10 +218,26 @@ class AccountReportController extends Controller
         return EcommerceOrder::with(['customer', 'items.product'])->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))->when($filters['customer_id'] ?? null, fn ($q, $id) => $id === 'walking' ? $q->whereNull('customer_id') : $q->where('customer_id', $id))->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('warehouse_id', $id))->when($filters['product_id'] ?? null, fn ($q, $id) => $q->whereHas('items', fn ($items) => $items->where('product_id', $id)))->when($filters['category_id'] ?? null, fn ($q, $id) => $q->whereHas('items.product', fn ($p) => $p->where('category_id', $id)));
     }
 
+    private function posSalesQuery(array $filters): Builder
+    {
+        return PosOrder::with(['customer', 'warehouse', 'items.product'])->where('status', 'completed')
+            ->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))
+            ->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))
+            ->when($filters['customer_id'] ?? null, fn ($q, $id) => $id === 'walking' ? $q->whereNull('customer_id') : $q->where('customer_id', $id))
+            ->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('warehouse_id', $id))
+            ->when($filters['product_id'] ?? null, fn ($q, $id) => $q->whereHas('items', fn ($items) => $items->where('product_id', $id)))
+            ->when($filters['category_id'] ?? null, fn ($q, $id) => $q->whereHas('items.product', fn ($p) => $p->where('category_id', $id)));
+    }
+
+    private function allSales(array $filters): Collection
+    {
+        return $this->salesQuery($filters)->get()->merge($this->posSalesQuery($filters)->get())->sortByDesc('created_at')->values();
+    }
+
     private function sales(array $filters): array
     {
-        $orders = $this->salesQuery($filters)->latest()->get();
-        return $this->base('Sales Report', ['Date', 'Order', 'Customer', 'Status', 'Items', 'Subtotal', 'Discount', 'Total'], $orders->map(fn ($o) => [$o->created_at->format('d M Y'), $o->order_number, $o->customer?->full_name ?: 'Walking customer / guest', ucfirst($o->status), number_format((float) $o->items->sum('quantity'), 3), $this->money($o->subtotal), $this->money($o->discount), $this->money($o->total)]), ['Orders' => $orders->count(), 'Sales' => $orders->sum('total'), 'Discount' => $orders->sum('discount')], ['date', 'customer', 'product', 'warehouse']);
+        $orders = $this->allSales($filters);
+        return $this->base('Sales Report', ['Date', 'Order', 'Channel', 'Customer', 'Status', 'Items', 'Subtotal', 'Discount', 'Total'], $orders->map(fn ($o) => [$o->created_at->format('d M Y'), $o->order_number, $this->salesChannel($o), $this->salesCustomer($o), ucfirst($o->status), number_format((float) $o->items->sum('quantity'), 3), $this->money($o->subtotal), $this->money($this->salesDiscount($o)), $this->money($o->total)]), ['Orders' => $orders->count(), 'Sales' => $orders->sum('total'), 'Discount' => $orders->sum(fn ($o) => $this->salesDiscount($o))], ['date', 'customer', 'product', 'warehouse'], 'Completed POS sales and ecommerce orders are included.');
     }
 
     private function purchasesQuery(array $filters): Builder
@@ -252,18 +294,26 @@ class AccountReportController extends Controller
     private function salesByProduct(array $filters): array
     {
         $items = $this->salesItems($filters); $groups = $items->groupBy(fn ($i) => $i->product_id ?: $i->product_name);
-        return $this->base('Sales Report (Product Wise)', ['Product', 'SKU', 'Quantity', 'Sales Value'], $groups->map(function ($group) { $first = $group->first(); return [$first->product?->name ?: $first->product_name, $first->product?->sku ?: '—', number_format((float) $group->sum('quantity'), 3), $this->money($group->sum('line_total'))]; })->values(), ['Quantity' => $items->sum('quantity'), 'Sales Value' => $items->sum('line_total')], ['date', 'customer', 'product', 'category', 'warehouse']);
+        return $this->base('Sales Report (Product Wise)', ['Product', 'SKU', 'Quantity', 'Sales Value'], $groups->map(function ($group) { $first = $group->first(); return [$first->product?->name ?: $first->product_name, $first->product?->sku ?: '—', number_format((float) $group->sum('quantity'), 3), $this->money($group->sum('report_line_total'))]; })->values(), ['Quantity' => $items->sum('quantity'), 'Sales Value' => $items->sum('report_line_total')], ['date', 'customer', 'product', 'category', 'warehouse']);
     }
 
     private function salesByCategory(array $filters): array
     {
         $items = $this->salesItems($filters); $groups = $items->groupBy(fn ($i) => $i->product?->category?->name ?: 'Uncategorized');
-        return $this->base('Sales Report (Category Wise)', ['Category', 'Quantity', 'Sales Value'], $groups->map(fn ($group, $name) => [$name, number_format((float) $group->sum('quantity'), 3), $this->money($group->sum('line_total'))])->values(), ['Quantity' => $items->sum('quantity'), 'Sales Value' => $items->sum('line_total')], ['date', 'customer', 'product', 'category', 'warehouse']);
+        return $this->base('Sales Report (Category Wise)', ['Category', 'Quantity', 'Sales Value'], $groups->map(fn ($group, $name) => [$name, number_format((float) $group->sum('quantity'), 3), $this->money($group->sum('report_line_total'))])->values(), ['Quantity' => $items->sum('quantity'), 'Sales Value' => $items->sum('report_line_total')], ['date', 'customer', 'product', 'category', 'warehouse']);
     }
 
     private function salesItems(array $filters): Collection
     {
-        return EcommerceOrderItem::with(['order', 'product.category'])->whereHas('order', fn ($q) => $this->applySalesFilters($q, $filters))->when($filters['product_id'] ?? null, fn ($q, $id) => $q->where('product_id', $id))->when($filters['category_id'] ?? null, fn ($q, $id) => $q->whereHas('product', fn ($p) => $p->where('category_id', $id)))->get();
+        $ecommerce = EcommerceOrderItem::with(['order', 'product.category'])->whereHas('order', fn ($q) => $this->applySalesFilters($q, $filters))->when($filters['product_id'] ?? null, fn ($q, $id) => $q->where('product_id', $id))->when($filters['category_id'] ?? null, fn ($q, $id) => $q->whereHas('product', fn ($p) => $p->where('category_id', $id)))->get();
+        $pos = PosOrderItem::with(['order', 'product.category'])->whereHas('order', fn ($q) => $this->applyPosSalesFilters($q, $filters))->when($filters['product_id'] ?? null, fn ($q, $id) => $q->where('product_id', $id))->when($filters['category_id'] ?? null, fn ($q, $id) => $q->whereHas('product', fn ($p) => $p->where('category_id', $id)))->get();
+        return $ecommerce->merge($pos)->map(function ($item) {
+            $order = $item->order;
+            $subtotal = (float) $order->subtotal;
+            $discount = $this->salesDiscount($order);
+            $item->setAttribute('report_line_total', $subtotal > 0 ? round((float) $item->line_total * (($subtotal - $discount) / $subtotal), 2) : (float) $item->line_total);
+            return $item;
+        });
     }
 
     private function userSales(array $filters): array
@@ -276,14 +326,16 @@ class AccountReportController extends Controller
 
     private function due(array $filters): array
     {
-        $orders = $this->salesQuery($filters)->where('payment_status', '!=', 'paid')->get();
-        return $this->base('Due Report', ['Date', 'Order', 'Customer', 'Payment Status', 'Due Amount'], $orders->map(fn ($o) => [$o->created_at->format('d M Y'), $o->order_number, $o->customer?->full_name ?: $o->customer_name, ucfirst($o->payment_status), $this->money($o->total)]), ['Due Orders' => $orders->count(), 'Due Amount' => $orders->sum('total')], ['date', 'customer', 'warehouse']);
+        $orders = $this->allSales($filters)->filter(fn ($o) => $o->customer_id && ($o instanceof PosOrder ? $o->payment_method === 'Due' : $o->payment_status !== 'paid'));
+        $withDue = $orders->map(fn ($order) => ['order' => $order, 'due' => $this->outstandingDue($order)])->filter(fn ($row) => $row['due'] > 0)->values();
+        $rows = $withDue->map(fn ($row) => [$row['order']->created_at->format('d M Y'), $row['order']->order_number, $this->salesChannel($row['order']), $this->salesCustomer($row['order']), $row['order'] instanceof PosOrder ? 'Due' : ucfirst($row['order']->payment_status), $this->money($row['due'])]);
+        return $this->base('Due Report', ['Date', 'Order', 'Channel', 'Customer', 'Payment Status', 'Due Amount'], $rows, ['Due Orders' => $withDue->count(), 'Due Amount' => $withDue->sum('due')], ['date', 'customer', 'warehouse']);
     }
 
     private function shipping(array $filters): array
     {
-        $orders = $this->salesQuery($filters)->get();
-        return $this->base('Shipping Cost Report', ['Date', 'Order', 'Customer', 'Warehouse', 'Shipping Cost'], $orders->map(fn ($o) => [$o->created_at->format('d M Y'), $o->order_number, $o->customer_name, $o->warehouse?->name ?: '—', $this->money($o->shipping_charge)]), ['Shipping Cost' => $orders->sum('shipping_charge')], ['date', 'customer', 'warehouse']);
+        $orders = $this->allSales($filters);
+        return $this->base('Shipping Cost Report', ['Date', 'Order', 'Channel', 'Customer', 'Warehouse', 'Shipping Cost'], $orders->map(fn ($o) => [$o->created_at->format('d M Y'), $o->order_number, $this->salesChannel($o), $this->salesCustomer($o), $o->warehouse?->name ?: '—', $this->money($o->shipping_charge ?? 0)]), ['Shipping Cost' => $orders->sum(fn ($o) => $o->shipping_charge ?? 0)], ['date', 'customer', 'warehouse']);
     }
 
     private function tax(array $filters): array
@@ -294,23 +346,24 @@ class AccountReportController extends Controller
 
     private function saleProfit(array $filters): array
     {
-        $orders = $this->salesQuery($filters)->get();
-        $rows = $orders->map(function ($o) { $cost = $o->items->sum(fn ($i) => (float) $i->quantity * (float) ($i->product?->buying_price ?? 0)); $profit = (float) $o->total - $cost - (float) $o->shipping_charge; return [$o->created_at->format('d M Y'), $o->order_number, $o->customer_name, $this->money($o->total), $this->money($cost), $this->money($o->shipping_charge), $this->money($profit), (float) $o->total > 0 ? number_format($profit / (float) $o->total * 100, 2).'%' : '0%']; });
-        $profit = $orders->sum(fn ($o) => (float) $o->total - $o->items->sum(fn ($i) => (float) $i->quantity * (float) ($i->product?->buying_price ?? 0)) - (float) $o->shipping_charge);
-        return $this->base('Profit Report (Sale Wise)', ['Date', 'Order', 'Customer', 'Sales', 'Product Cost', 'Shipping', 'Profit', 'Margin'], $rows, ['Sales' => $orders->sum('total'), 'Profit' => $profit], ['date', 'customer', 'product', 'warehouse']);
+        $orders = $this->allSales($filters);
+        $rows = $orders->map(function ($o) { $cost = $o->items->sum(fn ($i) => (float) $i->quantity * (float) ($i->product?->buying_price ?? 0)); $shipping = (float) ($o->shipping_charge ?? 0); $profit = (float) $o->total - $cost - $shipping; return [$o->created_at->format('d M Y'), $o->order_number, $this->salesChannel($o), $this->salesCustomer($o), $this->money($o->total), $this->money($cost), $this->money($shipping), $this->money($profit), (float) $o->total > 0 ? number_format($profit / (float) $o->total * 100, 2).'%' : '0%']; });
+        $profit = $orders->sum(fn ($o) => (float) $o->total - $o->items->sum(fn ($i) => (float) $i->quantity * (float) ($i->product?->buying_price ?? 0)) - (float) ($o->shipping_charge ?? 0));
+        return $this->base('Profit Report (Sale Wise)', ['Date', 'Order', 'Channel', 'Customer', 'Sales', 'Product Cost', 'Shipping', 'Profit', 'Margin'], $rows, ['Sales' => $orders->sum('total'), 'Profit' => $profit], ['date', 'customer', 'product', 'warehouse']);
     }
 
     private function entityLedger(array $filters, string $entity): array
     {
-        $key = $entity.'_id'; $entries = $this->ledgerQuery($filters)->whereNotNull($key)->when($filters[$key] ?? null, fn ($q, $id) => $q->where($key, $id))->orderBy('transaction_date')->orderBy('id')->get(); $running = 0;
-        $rows = $entries->map(function ($e) use (&$running, $entity) { $running += $e->entry_type === 'debit' ? (float) $e->amount : -(float) $e->amount; $party = $entity === 'supplier' ? $e->supplier?->name : $e->customer?->full_name; return [$e->transaction_date->format('d M Y'), $party ?: '—', $e->voucher_no, $e->ledger_comment ?: '—', $e->entry_type === 'debit' ? $this->money($e->amount) : '—', $e->entry_type === 'credit' ? $this->money($e->amount) : '—', $this->money($running)]; });
-        return $this->base(ucfirst($entity).' Ledger', ['Date', ucfirst($entity), 'Voucher', 'Narration', 'Debit', 'Credit', 'Balance'], $rows, ['Debit' => $entries->where('entry_type', 'debit')->sum('amount'), 'Credit' => $entries->where('entry_type', 'credit')->sum('amount'), 'Balance' => $running], ['date', $entity]);
+        $key = $entity.'_id'; $entries = $this->ledgerQuery($filters)->whereNotNull($key)->when($filters[$key] ?? null, fn ($q, $id) => $q->where($key, $id))->orderBy($key)->orderBy('transaction_date')->orderBy('id')->get(); $running = [];
+        $rows = $entries->map(function ($e) use (&$running, $entity, $key) { $partyId = $e->{$key}; $running[$partyId] = ($running[$partyId] ?? 0) + ($entity === 'supplier' ? ($e->entry_type === 'credit' ? (float) $e->amount : -(float) $e->amount) : ($e->entry_type === 'debit' ? (float) $e->amount : -(float) $e->amount)); $party = $entity === 'supplier' ? $e->supplier?->name : $e->customer?->full_name; return [$e->transaction_date->format('d M Y'), $party ?: '—', $e->voucher_no, $e->ledger_comment ?: '—', $e->entry_type === 'debit' ? $this->money($e->amount) : '—', $e->entry_type === 'credit' ? $this->money($e->amount) : '—', $this->money($running[$partyId])]; });
+        $balance = $entity === 'supplier' ? $entries->where('entry_type', 'credit')->sum('amount') - $entries->where('entry_type', 'debit')->sum('amount') : $entries->where('entry_type', 'debit')->sum('amount') - $entries->where('entry_type', 'credit')->sum('amount');
+        return $this->base(ucfirst($entity).' Ledger', ['Date', ucfirst($entity), 'Voucher', 'Narration', 'Debit', 'Credit', 'Balance'], $rows, ['Debit' => $entries->where('entry_type', 'debit')->sum('amount'), 'Credit' => $entries->where('entry_type', 'credit')->sum('amount'), 'Balance' => $balance], ['date', $entity]);
     }
 
     private function closing(array $filters, string $title): array
     {
         $date = $filters['to_date'] ?? now()->toDateString();
-        $sales = EcommerceOrder::whereDate('created_at', $date)->sum('total'); $purchases = Purchase::whereDate('purchase_date', $date)->sum('total');
+        $sales = EcommerceOrder::whereDate('created_at', $date)->sum('total') + PosOrder::where('status', 'completed')->whereDate('created_at', $date)->sum('total'); $purchases = Purchase::whereDate('purchase_date', $date)->sum('total');
         $receipts = AccountTransaction::whereDate('transaction_date', $date)->where('entry_type', 'debit')->sum('amount'); $payments = AccountTransaction::whereDate('transaction_date', $date)->where('entry_type', 'credit')->sum('amount');
         return $this->base($title, ['Particular', 'Amount'], collect([['Sales', $this->money($sales)], ['Purchases', $this->money($purchases)], ['Ledger Receipts', $this->money($receipts)], ['Ledger Payments', $this->money($payments)], ['Net Cash Movement', $this->money($receipts - $payments)]]), ['Sales' => $sales, 'Purchases' => $purchases, 'Net Movement' => $receipts - $payments], ['date']);
     }
@@ -326,6 +379,23 @@ class AccountReportController extends Controller
     private function applySalesFilters($q, array $filters): void
     {
         $q->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))->when($filters['customer_id'] ?? null, fn ($q, $id) => $id === 'walking' ? $q->whereNull('customer_id') : $q->where('customer_id', $id))->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('warehouse_id', $id));
+    }
+
+    private function applyPosSalesFilters($q, array $filters): void
+    {
+        $q->where('status', 'completed')->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '>=', $date))->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', '<=', $date))->when($filters['customer_id'] ?? null, fn ($q, $id) => $id === 'walking' ? $q->whereNull('customer_id') : $q->where('customer_id', $id))->when($filters['warehouse_id'] ?? null, fn ($q, $id) => $q->where('warehouse_id', $id));
+    }
+
+    private function salesChannel(EcommerceOrder|PosOrder $order): string { return $order instanceof PosOrder ? 'POS' : 'Ecommerce'; }
+    private function salesCustomer(EcommerceOrder|PosOrder $order): string { return $order->customer?->full_name ?: $order->customer_name ?: 'Walking customer / guest'; }
+    private function salesDiscount(EcommerceOrder|PosOrder $order): float { return (float) ($order instanceof PosOrder ? $order->discount_amount : $order->discount); }
+    private function outstandingDue(EcommerceOrder|PosOrder $order): float
+    {
+        $headId = AccountCoa::where('customer_id', $order->customer_id)->value('id');
+        if (! $headId) return (float) $order->total;
+        $foreign = $order instanceof PosOrder ? 'pos_order_id' : 'ecommerce_order_id';
+        $paid = AccountTransaction::where($foreign, $order->id)->where('account_coa_id', $headId)->where('entry_type', 'credit')->sum('amount');
+        return max(0, round((float) $order->total - (float) $paid, 2));
     }
 
     private function applyPurchaseFilters($q, array $filters): void

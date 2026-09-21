@@ -34,13 +34,13 @@ class AccountService
         return $this->ensureEntityHead('employee', $employee->id, $employee->name, '10015', 'asset');
     }
 
-    public function createChild(AccountCoa $parent, string $name): AccountCoa
+    public function createChild(AccountCoa $parent, string $name, bool $isGroup = false): AccountCoa
     {
         if (! $parent->is_group) {
             throw ValidationException::withMessages(['parent_id' => 'Choose a group account to create a sub-account.']);
         }
 
-        return DB::transaction(function () use ($parent, $name) {
+        return DB::transaction(function () use ($parent, $name, $isGroup) {
             $parent = AccountCoa::lockForUpdate()->findOrFail($parent->id);
             $sequence = $parent->children()->lockForUpdate()->count() + 1;
 
@@ -49,7 +49,7 @@ class AccountService
                 'code' => (string) (((int) $parent->code * 10) + $sequence),
                 'head_name' => $name,
                 'account_type' => $parent->account_type,
-                'is_group' => false,
+                'is_group' => $isGroup,
             ]);
         });
     }
@@ -63,12 +63,15 @@ class AccountService
         $voucherNo = strtoupper($data['voucher_type']).'-'.now()->format('YmdHis').'-'.random_int(100, 999);
         DB::transaction(function () use ($data, $amount, $voucherNo, $userId) {
             $accounts = AccountCoa::whereKey([$data['debit_account_id'], $data['credit_account_id']])->get()->keyBy('id');
+            $narration = filled($data['ledger_comment'] ?? null)
+                ? trim($data['ledger_comment'])
+                : $this->defaultNarration($data, $accounts);
             foreach ([['account_coa_id' => $data['debit_account_id'], 'entry_type' => 'debit'], ['account_coa_id' => $data['credit_account_id'], 'entry_type' => 'credit']] as $entry) {
                 $account = $accounts->get($entry['account_coa_id']);
                 AccountTransaction::create($entry + [
                     'voucher_no' => $voucherNo, 'voucher_type' => $data['voucher_type'], 'transaction_date' => $data['transaction_date'],
-                    'amount' => $amount, 'ledger_comment' => $data['ledger_comment'] ?? null,
-                    'supplier_id' => $data['supplier_id'] ?? $account?->supplier_id, 'customer_id' => $data['customer_id'] ?? $account?->customer_id,
+                    'amount' => $amount, 'ledger_comment' => $narration,
+                    'supplier_id' => $account?->supplier_id, 'customer_id' => $account?->customer_id,
                     'employee_id' => $data['employee_id'] ?? null, 'purchase_id' => $data['purchase_id'] ?? null,
                     'sale_id' => $data['sale_id'] ?? null, 'pos_order_id' => $data['pos_order_id'] ?? null, 'ecommerce_order_id' => $data['ecommerce_order_id'] ?? null, 'created_by' => $userId,
                 ]);
@@ -92,6 +95,9 @@ class AccountService
         }
 
         DB::transaction(function () use ($entries, $context, $userId) {
+            $narration = filled($context['ledger_comment'] ?? null)
+                ? trim($context['ledger_comment'])
+                : ucfirst($context['voucher_type'] ?? 'journal').' entry';
             foreach ($entries as $entry) {
                 AccountTransaction::create([
                     'voucher_no' => $context['voucher_no'],
@@ -100,7 +106,7 @@ class AccountService
                     'account_coa_id' => $entry['account_coa_id'],
                     'entry_type' => $entry['entry_type'],
                     'amount' => round((float) $entry['amount'], 2),
-                    'ledger_comment' => $context['ledger_comment'] ?? null,
+                    'ledger_comment' => $narration,
                     'supplier_id' => $context['supplier_id'] ?? null,
                     'customer_id' => $context['customer_id'] ?? null,
                     'purchase_id' => $context['purchase_id'] ?? null,
@@ -133,5 +139,14 @@ class AccountService
                 'head_name' => $name, 'account_type' => $type, 'is_group' => false, $column.'_id' => $id,
             ]);
         });
+    }
+
+    /** @param \Illuminate\Support\Collection<int, AccountCoa> $accounts */
+    private function defaultNarration(array $data, $accounts): string
+    {
+        $debit = $accounts->get($data['debit_account_id'])?->head_name ?? 'selected account';
+        $credit = $accounts->get($data['credit_account_id'])?->head_name ?? 'selected account';
+
+        return ucfirst($data['voucher_type'])." entry: Debit {$debit}; Credit {$credit}";
     }
 }

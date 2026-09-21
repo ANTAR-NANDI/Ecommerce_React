@@ -155,8 +155,8 @@ class PosOrderController extends Controller
         $customer = ! empty($data['customer_id']) ? Customer::find($data['customer_id']) : null;
         $method = ! empty($data['payment_method_id']) ? PaymentMethod::find($data['payment_method_id']) : null;
         $order = PosOrder::create(['order_number' => 'POS-'.now()->format('ymdHis').'-'.random_int(100, 999), 'warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status']] + $this->totals($data));
-        foreach ($data['items'] as $item) {
-            $order->items()->create($item + ['line_total' => round($item['quantity'] * $item['unit_price'], 2)]);
+        foreach ($this->orderItems($data['items']) as $item) {
+            $order->items()->create($item);
         }
 
         return $order;
@@ -168,8 +168,8 @@ class PosOrderController extends Controller
         $method = ! empty($data['payment_method_id']) ? PaymentMethod::find($data['payment_method_id']) : null;
         $order->update(['warehouse_id' => $data['warehouse_id'], 'customer_id' => $customer?->id, 'customer_name' => $customer?->full_name ?: ($data['customer_name'] ?? null), 'customer_phone' => $customer?->phone ?: ($data['customer_phone'] ?? null), 'payment_method' => $method?->name ?: ($data['payment_method'] ?? null), 'payment_method_id' => $method?->id, 'status' => $data['status']] + $this->totals($data));
         $order->items()->delete();
-        foreach ($data['items'] as $item) {
-            $order->items()->create($item + ['line_total' => round($item['quantity'] * $item['unit_price'], 2)]);
+        foreach ($this->orderItems($data['items']) as $item) {
+            $order->items()->create($item);
         }
     }
 
@@ -185,6 +185,32 @@ class PosOrderController extends Controller
         }
         $debitAccount = $isDue ? $this->accounts->ensureCustomerHead($customer) : $method->account;
         $this->accounts->postVoucher(['voucher_type' => 'credit', 'transaction_date' => now()->toDateString(), 'debit_account_id' => $debitAccount->id, 'credit_account_id' => $revenue->id, 'amount' => $order->total, 'ledger_comment' => 'POS sale '.$order->order_number, 'customer_id' => $isDue ? $customer?->id : null, 'pos_order_id' => $order->id], $userId);
+        $this->postCostOfGoodsSold($order, $userId);
+    }
+
+    private function orderItems(array $items): array
+    {
+        $costs = Product::whereKey(collect($items)->pluck('product_id'))->pluck('buying_price', 'id');
+
+        return collect($items)->map(fn ($item) => array_merge($item, [
+            'unit_cost' => (float) ($costs[$item['product_id']] ?? 0),
+            'line_total' => round($item['quantity'] * $item['unit_price'], 2),
+        ]))->all();
+    }
+
+    private function postCostOfGoodsSold(PosOrder $order, int $userId): void
+    {
+        $costOfGoods = AccountCoa::where('code', '5001')->firstOrFail();
+        if (AccountTransaction::where('pos_order_id', $order->id)->where('account_coa_id', $costOfGoods->id)->exists()) {
+            return;
+        }
+        $order->loadMissing(['items.product']);
+        $cost = round($order->items->sum(fn ($item) => (float) $item->quantity * (float) ($item->unit_cost ?: $item->product?->buying_price ?: 0)), 2);
+        if ($cost <= 0) {
+            return;
+        }
+        $inventory = AccountCoa::where('code', '10014')->firstOrFail();
+        $this->accounts->postVoucher(['voucher_type' => 'journal', 'transaction_date' => now()->toDateString(), 'debit_account_id' => $costOfGoods->id, 'credit_account_id' => $inventory->id, 'amount' => $cost, 'ledger_comment' => 'Cost of goods sold for POS sale '.$order->order_number, 'pos_order_id' => $order->id], $userId);
     }
 
     private function reserveStock(int $warehouseId, array $items): void
