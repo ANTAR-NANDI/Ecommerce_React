@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Blog;
 use App\Models\ContactMessage;
+use App\Models\Product;
 use App\Models\Promotion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -69,6 +70,29 @@ class PromotionAndBlogTest extends TestCase
         ])->assertCreated()->assertJsonPath('message', 'Thank you. Your message has been sent successfully.');
 
         $this->assertDatabaseHas('contact_messages', ['name' => 'Amina Rahman', 'subject' => 'Delivery question']);
+    }
+
+    public function test_checkout_rejects_a_quantity_that_exceeds_available_stock(): void
+    {
+        $product = Product::create([
+            'name' => 'Limited stock item',
+            'slug' => 'limited-stock-item',
+            'sku' => 'LIMITED-STOCK',
+            'short_description' => 'Only two items are available.',
+            'buying_price' => 10,
+            'selling_price' => 20,
+            'stock_quantity' => 2,
+        ]);
+
+        $this->postJson(route('checkout.store'), [
+            'name' => 'Amina Rahman',
+            'email' => 'amina@example.com',
+            'phone' => '+8801700000000',
+            'address' => '12 Example Road',
+            'payment_method' => 'cash_on_delivery',
+            'items' => [['id' => $product->id, 'quantity' => 3]],
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Limited stock item does not have enough stock available.');
     }
 
     public function test_public_blog_listing_returns_posts_and_categories(): void

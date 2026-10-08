@@ -28,9 +28,14 @@ class PublicCheckoutController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:150'], 'email' => ['required', 'email', 'max:255'], 'phone' => ['required', 'string', 'max:30'], 'address' => ['required', 'string', 'max:1000'], 'area' => ['nullable', 'string', 'max:150'], 'address_tag' => ['nullable', 'in:home,office,other'], 'note' => ['nullable', 'string', 'max:1000'], 'payment_method' => ['required', 'in:cash_on_delivery,card'], 'coupon_code' => ['nullable', 'string', 'max:50'], 'items' => ['required', 'array', 'min:1'], 'items.*.id' => ['required', 'integer', 'exists:products,id'], 'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99']]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:150'], 'email' => ['required', 'email', 'max:255'], 'phone' => ['required', 'string', 'max:30'], 'address' => ['required', 'string', 'max:1000'], 'area' => ['nullable', 'string', 'max:150'], 'address_tag' => ['nullable', 'in:home,office,other'], 'note' => ['nullable', 'string', 'max:1000'], 'payment_method' => ['required', 'in:cash_on_delivery,card'], 'coupon_code' => ['nullable', 'string', 'max:50'], 'items' => ['required', 'array', 'min:1'], 'items.*.id' => ['required', 'integer', 'distinct', 'exists:products,id'], 'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99']]);
         $products = Product::whereIn('id', collect($data['items'])->pluck('id'))->where('is_active', true)->get()->keyBy('id');
         abort_unless($products->count() === count($data['items']), 422, 'One or more products are no longer available.');
+        foreach ($data['items'] as $item) {
+            $product = $products[$item['id']];
+
+            abort_if($product->stock_quantity < $item['quantity'], 422, "{$product->name} does not have enough stock available.");
+        }
         $items = collect($data['items'])->map(function ($item) use ($products) {
             $product = $products[$item['id']];
             $price = (float) $product->selling_price;
